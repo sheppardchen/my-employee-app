@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2196F3">
     <meta charset="UTF-8">
     <title>企业员工自助服务与管理系统</title>
     <!-- 引入 SheetJS 用于导出 Excel -->
@@ -447,5 +449,14 @@
             XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`)
         })
     </script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker 注册成功: ', reg.scope))
+        .catch(err => console.log('Service Worker 注册失败: ', err));
+    });
+  }
+</script>
 </body>
 </html>
