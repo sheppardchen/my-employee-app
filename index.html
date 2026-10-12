@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>企业员工自助服务与管理系统</title>
+    <!-- 引入 SheetJS 用于导出 Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 800px; }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        h2, h3 { margin-top: 0; color: var(--text-main); text-align: center; }
+        h2 { font-size: 22px; margin-bottom: 16px; }
+        h3 { font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; text-align: left; }
+
+        .input-group { margin-bottom: 14px; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        button:hover { background: var(--primary-hover); }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+        .switch-btn {
+            background: transparent;
+            color: var(--primary-color);
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .switch-btn:hover { background: #f1f5f9; }
+
+        .welcome-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 10px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .logout-btn { background: #ef4444; width: auto; padding: 5px 10px; font-size: 12px; }
+        .logout-btn:hover { background: #dc2626; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+        th { background: #f1f5f9; color: var(--text-main); }
+        
+        .badge-pending { color: #d97706; font-weight: bold; }
+        .badge-approved { color: #16a34a; font-weight: bold; }
+        .badge-rejected { color: #dc2626; font-weight: bold; }
+
+        ul { padding-left: 20px; max-height: 150px; overflow-y: auto; margin: 0; font-size: 14px; color: var(--text-secondary); }
+        li { margin-bottom: 6px; }
+        .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 14px; }
+        .holiday-banner { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 12px; display: none; }
+        
+        .action-btns button { width: auto; padding: 4px 8px; font-size: 12px; margin-right: 4px; }
+        .btn-success { background: #10b981; }
+        .btn-danger { background: #ef4444; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 登录区域 -->
+        <div id="loginSection" class="card">
+            <h2>企业员工登录</h2>
+            <div class="input-group"><input type="email" id="loginEmail" placeholder="请输入员工邮箱"></div>
+            <div class="input-group"><input type="password" id="loginPassword" placeholder="请输入密码"></div>
+            <button id="loginBtn">登录系统</button>
+            <button class="switch-btn" id="toRegisterBtn">没有账号？点击注册新员工</button>
+        </div>
+
+        <!-- 注册区域 -->
+        <div id="registerSection" class="card" style="display: none;">
+            <h2>新员工自助注册</h2>
+            <div class="input-group"><input type="text" id="regName" placeholder="请输入您的真实姓名"></div>
+            <div class="input-group"><input type="email" id="regEmail" placeholder="请输入工作邮箱"></div>
+            <div class="input-group"><input type="password" id="regPassword" placeholder="设置登录密码（至少6位）"></div>
+            <div class="input-group"><input type="password" id="regConfirmPassword" placeholder="请再次输入密码确认"></div>
+            <button id="registerBtn" style="background: #10b981;">提交注册申请</button>
+            <button class="switch-btn" id="toLoginBtn">已有账号？返回登录</button>
+        </div>
+
+        <!-- 待审核提示区域 -->
+        <div id="pendingSection" class="card" style="display: none; text-align: center;">
+            <h2 style="color: #d97706;">⏳ 账号正在审核中</h2>
+            <p style="color: var(--text-secondary);">您的注册申请已提交，请等待管理员批准后方可登录。</p>
+            <button class="switch-btn" id="backToLoginBtn">返回登录页面</button>
+        </div>
+
+        <!-- 员工主功能看板 -->
+        <div id="dashboardSection" style="display: none;">
+            <div class="welcome-bar">
+                <span id="welcomeUser" style="font-weight: bold; color: var(--text-main);"></span>
+                <button class="logout-btn" id="logoutBtn">退出登录</button>
+            </div>
+
+            <!-- 公告栏 -->
+            <div class="card">
+                <h3>📢 公司公告栏</h3>
+                <div id="announcementList">加载公告中...</div>
+            </div>
+
+            <!-- 考勤打卡模块 -->
+            <div class="card">
+                <h3>⏰ 考勤打卡中心 (上班 09:00 / 下班 18:00)</h3>
+                <div id="holidayBanner" class="holiday-banner">🏖️今天是法定节假日/周末，无需打卡！</div>
+                <button id="clockBtn">正在检查节假日与打卡状态...</button>
+                <p id="clockResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
+                <h4 style="font-size:14px; margin:12px 0 6px 0;">我的近期打卡记录：</h4>
+                <ul id="historyList"><li>加载中...</li></ul>
+            </div>
+
+            <!-- 请假申请模块 -->
+            <div class="card">
+                <h3>📝 提交请假申请</h3>
+                <div class="input-group">
+                    <select id="leaveType">
+                        <option value="事假">事假</option>
+                        <option value="病假">病假</option>
+                        <option value="年假">年假</option>
+                    </select>
+                </div>
+                <div class="input-group">开始日期：<input type="date" id="startDate"></div>
+                <div class="input-group">结束日期：<input type="date" id="endDate"></div>
+                <div class="input-group"><textarea id="leaveReason" placeholder="请输入请假原因..." rows="2"></textarea></div>
+                <button id="submitLeaveBtn">提交请假申请</button>
+                <p id="leaveResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
+                
+                <h4 style="font-size:14px; margin:12px 0 6px 0;">我的请假记录：</h4>
+                <ul id="leaveHistoryList"><li>加载中...</li></ul>
+            </div>
+        </div>
+
+        <!-- 管理员专属控制台 -->
+        <div id="adminSection" style="display: none;">
+            <div class="welcome-bar" style="background: #e0e7ff; color: #3730a3;">
+                <span style="font-weight: bold;">👑 管理员控制台</span>
+                <button class="logout-btn" id="adminLogoutBtn">退出登录</button>
+            </div>
+
+            <!-- 新员工审核 -->
+            <div class="card">
+                <h3>👥 新员工注册审核</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>姓名</th><th>注册时间</th><th>状态</th><th>操作</th></tr>
+                        </thead>
+                        <tbody id="adminUserList"><tr><td colspan="4">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 请假审批工作流 -->
+            <div class="card">
+                <h3>📋 员工请假审批</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>类型</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr>
+                        </thead>
+                        <tbody id="adminLeaveList"><tr><td colspan="5">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 考勤数据与导出 -->
+            <div class="card">
+                <h3>📊 全公司考勤报表导出</h3>
+                <p style="font-size: 13px; color: var(--text-secondary);">支持一键导出所有员工的打卡历史明细至 Excel 表格，方便人事核算薪资。</p>
+                <button id="exportExcelBtn" style="background: #059669;">📥 导出考勤报表为 Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI'
+
+        const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        const loginSection = document.getElementById('loginSection')
+        const registerSection = document.getElementById('registerSection')
+        const pendingSection = document.getElementById('pendingSection')
+        const dashboardSection = document.getElementById('dashboardSection')
+        const adminSection = document.getElementById('adminSection')
+
+        let currentClockState = 'in'
+        let sHolidayToday = false
+
+        document.getElementById('toRegisterBtn').addEventListener('click', () => { loginSection.style.display = 'none'; registerSection.style.display = 'block'; })
+        document.getElementById('toLoginBtn').addEventListener('click', () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; })
+        document.getElementById('backToLoginBtn').addEventListener('click', () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; })
+
+        // 注册
+        document.getElementById('registerBtn').addEventListener('click', async () => {
+            const name = document.getElementById('regName').value.trim()
+            const email = document.getElementById('regEmail').value.trim()
+            const password = document.getElementById('regPassword').value.trim()
+            const confirmPassword = document.getElementById('regConfirmPassword').value.trim()
+
+            if (!name || !email || !password || !confirmPassword) { alert('请完整填写！'); return; }
+            if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
+            if (password.length < 6) { alert('密码至少6位！'); return; }
+
+            const { error: authError } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } })
+            if (authError) { alert('注册失败: ' + authError.message); } 
+            else {
+                alert('🎉 注册申请已提交！等待管理员审批。')
+                registerSection.style.display = 'none'; pendingSection.style.display = 'block';
+            }
+        })
+
+        // 登录分流（普通员工 vs 管理员）
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail').value.trim()
+            const password = document.getElementById('loginPassword').value.trim()
+            if (!email || !password) { alert('请填写邮箱和密码！'); return; }
+
+            const { data, error } = await sbClient.auth.signInWithPassword({ email, password })
+            if (error) { alert('登录失败: ' + error.message); return; }
+
+            const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single()
+            if (profileError || !profile) { alert('未找到员工档案'); await sbClient.auth.signOut(); return; }
+
+            if (!profile.is_approved) {
+                await sbClient.auth.signOut()
+                loginSection.style.display = 'none'; pendingSection.style.display = 'block';
+                return
+            }
+
+            loginSection.style.display = 'none'
+            if (profile.role === 'admin') {
+                adminSection.style.display = 'block'
+                loadAdminData()
+            } else {
+                dashboardSection.style.display = 'block'
+                document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`
+                loadEmployeeData()
+            }
+        })
+
+        const logoutHandler = async () => { await sbClient.auth.signOut(); location.reload(); }
+        document.getElementById('logoutBtn').addEventListener('click', logoutHandler)
+        document.getElementById('adminLogoutBtn').addEventListener('click', logoutHandler)
+
+        // 员工端数据加载
+        function loadEmployeeData() {
+            loadAnnouncements()
+            checkHolidayAndAttendance()
+            loadHistory()
+            loadLeaveHistory()
+        }
+
+        async function loadAnnouncements() {
+            const { data } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false }).limit(3)
+            document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:14px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span>${i.content}</span></div>`).join('')
+        }
+
+        async function checkHolidayAndAttendance() {
+            const now = new Date()
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+            let isHoliday = (now.getDay() === 0 || now.getDay() === 6)
+            try {
+                const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${now.getFullYear()}/CN`)
+                if (res.ok) {
+                    const holidays = await res.json()
+                    if (holidays.find(h => h.date === todayStr)) isHoliday = true
+                }
+            } catch(e){}
+
+            sHolidayToday = isHoliday
+            const banner = document.getElementById('holidayBanner')
+            const btn = document.getElementById('clockBtn')
+            if (isHoliday) {
+                banner.style.display = 'block'; banner.textContent = '🏖️ 今日是节假日/周末，无需打卡！'
+                btn.textContent = '今日放假'; btn.style.background = '#94a3b8'; btn.disabled = true; return
+            }
+            banner.style.display = 'none'
+
+            const { data: { user } } = await sbClient.auth.getUser()
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', todayStart.toISOString())
+            
+            const hasIn = records?.some(r => r.clock_type === 'in')
+            const hasOut = records?.some(r => r.clock_type === 'out')
+            const tip = document.getElementById('clockResult')
+
+            if (!hasIn) { currentClockState = 'in'; btn.textContent = '🟢 上班打卡 (09:00)'; btn.style.background = '#2563eb'; btn.disabled = false; }
+            else if (!hasOut) { currentClockState = 'out'; btn.textContent = '🔵 下班打卡 (18:00)'; btn.style.background = '#0d9488'; btn.disabled = false; tip.textContent = '✅ 已完成上班打卡'; }
+            else { btn.textContent = '✨ 今日考勤已完成'; btn.style.background = '#cbd5e1'; btn.disabled = true; tip.textContent = '🎉 今日两次打卡均已完成！'; }
+        }
+
+        document.getElementById('clockBtn').addEventListener('click', async () => {
+            const { data: { user } } = await sbClient.auth.getUser()
+            const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }])
+            const tip = document.getElementById('clockResult')
+            if (error) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
+            else { tip.style.color = '#16a34a'; tip.textContent = '🎉 打卡成功！'; checkHolidayAndAttendance(); loadHistory(); }
+        })
+
+        async function loadHistory() {
+            const { data: { user } } = await sbClient.auth.getUser()
+            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5)
+            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('')
+        }
+
+        document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
+            const { data: { user } } = await sbClient.auth.getUser()
+            const type = document.getElementById('leaveType').value
+            const start = document.getElementById('startDate').value
+            const end = document.getElementById('endDate').value
+            const reason = document.getElementById('leaveReason').value.trim()
+            const tip = document.getElementById('leaveResult')
+
+            if (!start || !end) { alert('请选择起止日期'); return; }
+            const { error } = await sbClient.from('leave_requests').insert([{ user_id: user.id, leave_type: type, start_date: start, end_date: end, reason, status: '待审批' }])
+            if (error) { tip.style.color = '#dc2626'; tip.textContent = '提交失败'; }
+            else { tip.style.color = '#16a34a'; tip.textContent = '✅ 请假已提交！'; loadLeaveHistory(); }
+        })
+
+        async function loadLeaveHistory() {
+            const { data: { user } } = await sbClient.auth.getUser()
+            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
+            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.leave_type}] ${i.start_date}至${i.end_date} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('')
+        }
+
+        // 管理员端数据与操作
+        function loadAdminData() {
+            loadAdminUsers()
+            loadAdminLeaves()
+        }
+
+        async function loadAdminUsers() {
+            const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false })
+            const tbody = document.getElementById('adminUserList')
+            tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">暂无员工</td></tr>' : data.map(u => `
+                <tr>
+                    <td>${u.full_name}</td>
+                    <td>${new Date(u.created_at).toLocaleString()}</td>
+                    <td>${u.is_approved ? '<span class="badge-approved">已批准</span>' : '<span class="badge-pending">待审批</span>'}</td>
+                    <td class="action-btns">
+                        ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id}')">批准</button>` : ''}
+                        <button class="btn-danger" onclick="deleteUser('${u.id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('')
+        }
+
+        window.approveUser = async (id) => {
+            await sbClient.from('profiles').update({ is_approved: true }).eq('id', id)
+            alert('已批准该员工！')
+            loadAdminUsers()
+        }
+
+        window.deleteUser = async (id) => {
+            if (!confirm('确定删除该员工档案吗？')) return;
+            await sbClient.from('profiles').delete().eq('id', id)
+            loadAdminUsers()
+        }
+
+        async function loadAdminLeaves() {
+            const { data } = await sbClient.from('leave_requests').select('*, profiles(full_name)').order('created_at', { ascending: false })
+            const tbody = document.getElementById('adminLeaveList')
+            tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="5">暂无请假申请</td></tr>' : data.map(l => `
+                <tr>
+                    <td>${l.profiles?.full_name || '未知'} (${l.leave_type})</td>
+                    <td>${l.start_date} ~ ${l.end_date}</td>
+                    <td>${l.reason || '无'}</td>
+                    <td><span class="badge-${l.status==='已批准'?'approved':l.status==='已拒绝'?'rejected':'pending'}">${l.status}</span></td>
+                    <td class="action-btns">
+                        <button class="btn-success" onclick="updateLeave('${l.id}', '已批准')">批准</button>
+                        <button class="btn-danger" onclick="updateLeave('${l.id}', '已拒绝')">拒绝</button>
+                    </td>
+                </tr>
+            `).join('')
+        }
+
+        window.updateLeave = async (id, status) => {
+            await sbClient.from('leave_requests').update({ status }).eq('id', id)
+            alert(`已更新状态为：${status}`)
+            loadAdminLeaves()
+        }
+
+        // Excel 导出考勤报表
+        document.getElementById('exportExcelBtn').addEventListener('click', async () => {
+            const { data, error } = await sbClient.from('attendance').select('*, profiles(full_name)').order('clock_in_time', { ascending: false })
+            if (error || !data || data.length === 0) { alert('暂无考勤数据可导出'); return; }
+
+            const excelData = data.map(item => ({
+                '员工姓名': item.profiles?.full_name || '未知',
+                '打卡类型': item.clock_type === 'in' ? '上班打卡' : '下班打卡',
+                '打卡时间': new Date(item.clock_in_time).toLocaleString()
+            }))
+
+            const worksheet = XLSX.utils.json_to_sheet(excelData)
+            const workbook = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(workbook, worksheet, "考勤明细")
+            XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`)
+        })
+    </script>
+</body>
+</html>
