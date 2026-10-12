@@ -40,7 +40,7 @@
 
         h2, h3 { margin-top: 0; color: var(--text-main); text-align: center; }
         h2 { font-size: 22px; margin-bottom: 16px; }
-        h3 { font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; text-align: left; }
+        h3 { font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
 
         .input-group { margin-bottom: 14px; }
         input, select, textarea {
@@ -104,6 +104,7 @@
         .action-btns button { width: auto; padding: 4px 8px; font-size: 12px; margin-right: 4px; }
         .btn-success { background: #10b981; }
         .btn-danger { background: #ef4444; }
+        .btn-sm { width: auto; padding: 4px 10px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -187,7 +188,7 @@
                 <button class="logout-btn" id="adminLogoutBtn">退出登录</button>
             </div>
 
-            <!-- 管理员发布通知 -->
+            <!-- 1. 管理员发布通知 -->
             <div class="card">
                 <h3>📢 发布公司通知</h3>
                 <div class="input-group">
@@ -200,7 +201,24 @@
                 <p id="announcementResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
             </div>
 
-            <!-- 新员工审核 -->
+            <!-- 2. 全公司实时打卡记录监控（新增独立醒目模块） -->
+            <div class="card" style="border: 2px solid #3b82f6;">
+                <h3>
+                    <span>⚡ 全公司实时打卡监控</span>
+                    <button id="refreshAttendanceBtn" class="btn-sm" style="background: #2563eb;">🔄 刷新打卡</button>
+                </h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">实时展示全公司员工最近的上下班打卡动态。</p>
+                <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>员工姓名</th><th>打卡类型</th><th>打卡时间</th></tr>
+                        </thead>
+                        <tbody id="adminAttendanceList"><tr><td colspan="3">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. 新员工审核 -->
             <div class="card">
                 <h3>👥 新员工注册审核</h3>
                 <div style="overflow-x: auto;">
@@ -213,7 +231,7 @@
                 </div>
             </div>
 
-            <!-- 员工请假审批 -->
+            <!-- 4. 员工请假审批 -->
             <div class="card">
                 <h3>📋 员工请假审批</h3>
                 <div style="overflow-x: auto;">
@@ -226,21 +244,7 @@
                 </div>
             </div>
 
-            <!-- 新增：全公司实时打卡记录监控 -->
-            <div class="card">
-                <h3>⚡ 全公司实时打卡记录</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);">实时展示员工打卡动态，方便核查出勤情况。</p>
-                <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr><th>员工姓名</th><th>打卡类型</th><th>打卡时间</th></tr>
-                        </thead>
-                        <tbody id="adminAttendanceList"><tr><td colspan="3">加载中...</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 考勤数据与导出 -->
+            <!-- 5. 考勤数据与导出 -->
             <div class="card">
                 <h3>📊 全公司考勤报表导出</h3>
                 <p style="font-size: 13px; color: var(--text-secondary);">支持一键导出所有员工的打卡历史明细至 Excel 表格，方便人事核算薪资。</p>
@@ -254,7 +258,13 @@
         const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co'
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI'
 
-        const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true
+            }
+        })
 
         const loginSection = document.getElementById('loginSection')
         const registerSection = document.getElementById('registerSection')
@@ -265,28 +275,32 @@
         let currentClockState = 'in'
         let sHolidayToday = false
 
-        // 页面加载时自动检查持久化登录状态
+        // 页面加载时自动恢复持久化登录状态
         window.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await sbClient.auth.getSession()
-            if (session && session.user) {
-                const { data: profile, error } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single()
-                if (!error && profile) {
-                    if (!profile.is_approved) {
-                        loginSection.style.display = 'none'
-                        pendingSection.style.display = 'block'
-                        return
-                    }
+            try {
+                const { data: { session }, error: sessionError } = await sbClient.auth.getSession()
+                if (sessionError || !session || !session.user) return
 
+                const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single()
+                if (profileError || !profile) return
+
+                if (!profile.is_approved) {
                     loginSection.style.display = 'none'
-                    if (profile.role === 'admin') {
-                        adminSection.style.display = 'block'
-                        loadAdminData()
-                    } else {
-                        dashboardSection.style.display = 'block'
-                        document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`
-                        loadEmployeeData()
-                    }
+                    pendingSection.style.display = 'block'
+                    return
                 }
+
+                loginSection.style.display = 'none'
+                if (profile.role === 'admin') {
+                    adminSection.style.display = 'block'
+                    loadAdminData()
+                } else {
+                    dashboardSection.style.display = 'block'
+                    document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`
+                    loadEmployeeData()
+                }
+            } catch (err) {
+                console.error('自动恢复登录状态异常:', err)
             }
         })
 
@@ -382,214 +396,4 @@
 
             const { data: { user } } = await sbClient.auth.getUser()
             const todayStart = new Date(); todayStart.setHours(0,0,0,0)
-            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', todayStart.toISOString())
-            
-            const hasIn = records?.some(r => r.clock_type === 'in')
-            const hasOut = records?.some(r => r.clock_type === 'out')
-            const tip = document.getElementById('clockResult')
-
-            if (!hasIn) { currentClockState = 'in'; btn.textContent = '🟢 上班打卡 (09:00)'; btn.style.background = '#2563eb'; btn.disabled = false; }
-            else if (!hasOut) { currentClockState = 'out'; btn.textContent = '🔵 下班打卡 (18:00)'; btn.style.background = '#0d9488'; btn.disabled = false; tip.textContent = '✅ 已完成上班打卡'; }
-            else { btn.textContent = '✨ 今日考勤已完成'; btn.style.background = '#cbd5e1'; btn.disabled = true; tip.textContent = '🎉 今日两次打卡均已完成！'; }
-        }
-
-        document.getElementById('clockBtn').addEventListener('click', async () => {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }])
-            const tip = document.getElementById('clockResult')
-            if (error) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
-            else { tip.style.color = '#16a34a'; tip.textContent = '🎉 打卡成功！'; checkHolidayAndAttendance(); loadHistory(); }
-        })
-
-        async function loadHistory() {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5)
-            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('')
-        }
-
-        document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const type = document.getElementById('leaveType').value
-            const start = document.getElementById('startDate').value
-            const end = document.getElementById('endDate').value
-            const reason = document.getElementById('leaveReason').value.trim()
-            const tip = document.getElementById('leaveResult')
-
-            if (!start || !end) { alert('请选择起止日期'); return; }
-            const { error } = await sbClient.from('leave_requests').insert([{ user_id: user.id, leave_type: type, start_date: start, end_date: end, reason, status: '待审批' }])
-            if (error) { tip.style.color = '#dc2626'; tip.textContent = '提交失败'; }
-            else { tip.style.color = '#16a34a'; tip.textContent = '✅ 请假已提交！'; loadLeaveHistory(); }
-        })
-
-        async function loadLeaveHistory() {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
-            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.leave_type}] ${i.start_date}至${i.end_date} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('')
-        }
-
-        // 管理员端数据与操作
-        function loadAdminData() {
-            loadAdminUsers()
-            loadAdminLeaves()
-            loadAdminAttendance()
-        }
-
-        // 管理员发布通知逻辑
-        document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
-            const title = document.getElementById('announcementTitleInput').value.trim()
-            const content = document.getElementById('announcementContentInput').value.trim()
-            const tip = document.getElementById('announcementResult')
-
-            if (!title || !content) { alert('请填写通知标题和内容！'); return; }
-
-            const { error } = await sbClient.from('announcements').insert([{ title, content }])
-            if (error) {
-                tip.style.color = '#dc2626'
-                tip.textContent = '发布失败: ' + error.message
-            } else {
-                tip.style.color = '#16a34a'
-                tip.textContent = '🎉 通知发布成功！所有员工将实时在公告栏看到。'
-                document.getElementById('announcementTitleInput').value = ''
-                document.getElementById('announcementContentInput').value = ''
-            }
-        })
-
-        async function loadAdminUsers() {
-            const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false })
-            const tbody = document.getElementById('adminUserList')
-            tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">暂无员工</td></tr>' : data.map(u => `
-                <tr>
-                    <td>${u.full_name}</td>
-                    <td>${new Date(u.created_at).toLocaleString()}</td>
-                    <td>${u.is_approved ? '<span class="badge-approved">已批准</span>' : '<span class="badge-pending">待审批</span>'}</td>
-                    <td class="action-btns">
-                        ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id}')">批准</button>` : ''}
-                        <button class="btn-danger" onclick="deleteUser('${u.id}')">删除</button>
-                    </td>
-                </tr>
-            `).join('')
-        }
-
-        window.approveUser = async (id) => {
-            await sbClient.from('profiles').update({ is_approved: true }).eq('id', id)
-            alert('已批准该员工！')
-            loadAdminUsers()
-        }
-
-        window.deleteUser = async (id) => {
-            if (!confirm('确定删除该员工档案吗？')) return;
-            await sbClient.from('profiles').delete().eq('id', id)
-            loadAdminUsers()
-        }
-
-        // 管理员加载请假审批列表（解耦版）
-        async function loadAdminLeaves() {
-            try {
-                const { data: leaves, error: leaveError } = await sbClient
-                    .from('leave_requests')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (leaveError || !leaves || leaves.length === 0) {
-                    document.getElementById('adminLeaveList').innerHTML = '<tr><td colspan="5">暂无请假申请</td></tr>';
-                    return;
-                }
-
-                const userIds = [...new Set(leaves.map(l => l.user_id))];
-                const { data: profiles } = await sbClient.from('profiles').select('id, full_name').in('id', userIds);
-                const profileMap = {};
-                if (profiles) profiles.forEach(p => { profileMap[p.id] = p.full_name; });
-
-                const tbody = document.getElementById('adminLeaveList');
-                tbody.innerHTML = leaves.map(l => {
-                    const fullName = profileMap[l.user_id] || '未知员工';
-                    const statusClass = l.status === '已批准' ? 'approved' : l.status === '已拒绝' ? 'rejected' : 'pending';
-                    return `
-                        <tr>
-                            <td>${fullName} (${l.leave_type})</td>
-                            <td>${l.start_date} ~ ${l.end_date}</td>
-                            <td>${l.reason || '无'}</td>
-                            <td><span class="badge-${statusClass}">${l.status}</span></td>
-                            <td class="action-btns">
-                                <button class="btn-success" onclick="updateLeave('${l.id}', '已批准')">批准</button>
-                                <button class="btn-danger" onclick="updateLeave('${l.id}', '已拒绝')">拒绝</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            } catch (err) {
-                console.error('loadAdminLeaves 异常:', err);
-            }
-        }
-
-        window.updateLeave = async (id, status) => {
-            await sbClient.from('leave_requests').update({ status }).eq('id', id)
-            alert(`已更新状态为：${status}`)
-            loadAdminLeaves()
-        }
-
-        // 新增：管理员加载全公司实时打卡记录
-        async function loadAdminAttendance() {
-            try {
-                const { data: records, error } = await sbClient
-                    .from('attendance')
-                    .select('*')
-                    .order('clock_in_time', { ascending: false })
-                    .limit(20);
-
-                if (error || !records || records.length === 0) {
-                    document.getElementById('adminAttendanceList').innerHTML = '<tr><td colspan="3">暂无打卡记录</td></tr>';
-                    return;
-                }
-
-                const userIds = [...new Set(records.map(r => r.user_id))];
-                const { data: profiles } = await sbClient.from('profiles').select('id, full_name').in('id', userIds);
-                const profileMap = {};
-                if (profiles) profiles.forEach(p => { profileMap[p.id] = p.full_name; });
-
-                const tbody = document.getElementById('adminAttendanceList');
-                tbody.innerHTML = records.map(r => {
-                    const fullName = profileMap[r.user_id] || '未知员工';
-                    const typeText = r.clock_type === 'in' ? '🟢 上班打卡' : '🔴 下班打卡';
-                    const timeStr = new Date(r.clock_in_time).toLocaleString();
-                    return `
-                        <tr>
-                            <td>${fullName}</td>
-                            <td>${typeText}</td>
-                            <td>${timeStr}</td>
-                        </tr>
-                    `;
-                }).join('');
-            } catch (err) {
-                console.error('loadAdminAttendance 异常:', err);
-            }
-        }
-
-        // Excel 导出考勤报表
-        document.getElementById('exportExcelBtn').addEventListener('click', async () => {
-            const { data, error } = await sbClient.from('attendance').select('*, profiles(full_name)').order('clock_in_time', { ascending: false })
-            if (error || !data || data.length === 0) { alert('暂无考勤数据可导出'); return; }
-
-            const excelData = data.map(item => ({
-                '员工姓名': item.profiles?.full_name || '未知',
-                '打卡类型': item.clock_type === 'in' ? '上班打卡' : '下班打卡',
-                '打卡时间': new Date(item.clock_in_time).toLocaleString()
-            }))
-
-            const worksheet = XLSX.utils.json_to_sheet(excelData)
-            const workbook = XLSX.utils.book_new()
-            XLSX.utils.book_append_sheet(workbook, worksheet, "考勤明细")
-            XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`)
-        })
-    </script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('Service Worker 注册成功: ', reg.scope))
-            .catch(err => console.log('Service Worker 注册失败: ', err));
-        });
-      }
-    </script>
-</body>
-</html>
+            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id',
