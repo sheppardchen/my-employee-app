@@ -759,7 +759,7 @@
             }).join('');
         }
 
-        // 💡 重点改进：点击批准/拒绝时，同时精准同步更新 is_approved 与 status 列
+        // 💡 完善的审批操作：同时同步更新 is_approved (bool) 与 status (text)
         window.reviewUser = async (id, action) => {
             const isApproved = (action === '批准');
             const statusText = isApproved ? '已批准' : '已拒绝';
@@ -777,7 +777,7 @@
             }
         };
 
-        // 通过安全的 RPC 存储过程绕过删除权限拦截
+        // 通过安全的 RPC 存储过程绕过权限拦截删除
         window.deleteUserRPC = async (id) => {
             if (!confirm('确定要彻底删除该申请人的注册信息吗？删除后不可恢复。')) return;
             
