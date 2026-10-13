@@ -95,7 +95,7 @@
         .badge-pending { color: #d97706; font-weight: bold; }
         .badge-approved { color: #16a34a; font-weight: bold; }
         .badge-rejected { color: #dc2626; font-weight: bold; }
-        .badge-late { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
+        .badge-abnormal { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
         .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 20px; max-height: 150px; overflow-y: auto; margin: 0; font-size: 14px; color: var(--text-secondary); }
@@ -158,7 +158,7 @@
 
             <!-- 考勤打卡模块 -->
             <div class="card">
-                <h3>⏰ 考勤打卡中心 (上班 09:00 / 下班 18:00)</h3>
+                <h3>⏰ 考勤打卡中心 (限定：永安锦苑7栋 250米内)</h3>
                 <div id="holidayBanner" class="holiday-banner">🏖️今天是法定节假日/周末，无需打卡！</div>
                 <button id="clockBtn">正在检查节假日与打卡状态...</button>
                 <p id="clockResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
@@ -223,7 +223,7 @@
                     <span>📈 智能考勤分析与统计</span>
                     <button id="analyzeAttendanceBtn" class="btn-sm" style="background: #10b981;">📊 刷新分析</button>
                 </h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">自动分析全公司打卡数据，识别迟到情况与员工出勤频次。</p>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">规则：上班 09:00 前正常，下班 18:00 后正常，其余异常。</p>
                 
                 <div class="stats-grid">
                     <div class="stat-box">
@@ -231,11 +231,11 @@
                         <div id="statTotal" class="stat-num">0</div>
                     </div>
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">正常上班</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">正常考勤</div>
                         <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
                     </div>
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">迟到/异常</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">异常考勤</div>
                         <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
                     </div>
                 </div>
@@ -314,6 +314,13 @@
                 detectSessionInUrl: true
             }
         });
+
+        // 📍 公司打卡地理围栏配置（浙江省温州市龙湾区瑶溪街道永安锦苑7栋，范围缩减为 250米）
+        const COMPANY_LOCATION = {
+            latitude: 27.935600,   // 中心纬度
+            longitude: 120.785000, // 中心经度
+            maxDistance: 250       // 允许打卡的最大半径（单位：米）
+        };
 
         const loginSection = document.getElementById('loginSection');
         const registerSection = document.getElementById('registerSection');
@@ -451,17 +458,73 @@
             const hasOut = records?.some(r => r.clock_type === 'out');
             const tip = document.getElementById('clockResult');
 
-            if (!hasIn) { currentClockState = 'in'; btn.textContent = '🟢 上班打卡 (09:00)'; btn.style.background = '#2563eb'; btn.disabled = false; }
-            else if (!hasOut) { currentClockState = 'out'; btn.textContent = '🔵 下班打卡 (18:00)'; btn.style.background = '#0d9488'; btn.disabled = false; tip.textContent = '✅ 已完成上班打卡'; }
+            if (!hasIn) { currentClockState = 'in'; btn.textContent = '🟢 上班打卡 (09:00前)'; btn.style.background = '#2563eb'; btn.disabled = false; }
+            else if (!hasOut) { currentClockState = 'out'; btn.textContent = '🔵 下班打卡 (18:00后)'; btn.style.background = '#0d9488'; btn.disabled = false; tip.textContent = '✅ 已完成上班打卡'; }
             else { btn.textContent = '✨ 今日考勤已完成'; btn.style.background = '#cbd5e1'; btn.disabled = true; tip.textContent = '🎉 今日两次打卡均已完成！'; }
         }
 
+        // 计算两点经纬度之间的距离（返回单位：米）
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // 地球半径（米）
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 📍 点击打卡：校验 250米 地理围栏
         document.getElementById('clockBtn').addEventListener('click', async () => {
-            const { data: { user } } = await sbClient.auth.getUser();
-            const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
             const tip = document.getElementById('clockResult');
-            if (error) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
-            else { tip.style.color = '#16a34a'; tip.textContent = '🎉 打卡成功！'; checkHolidayAndAttendance(); loadHistory(); }
+            tip.style.color = '#2563eb';
+            tip.textContent = '📍 正在获取您的 GPS 定位，请允许浏览器定位请求...';
+
+            if (!navigator.geolocation) {
+                alert('您的浏览器不支持地理定位功能！');
+                tip.textContent = '打卡失败：浏览器不支持定位';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const userLat = position.coords.latitude;
+                const userLon = position.coords.longitude;
+
+                // 计算与永安锦苑7栋的距离（米）
+                const distance = calculateDistance(userLat, userLon, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
+
+                if (distance > COMPANY_LOCATION.maxDistance) {
+                    tip.style.color = '#dc2626';
+                    tip.textContent = `❌ 打卡失败：您当前位置距离公司约 ${Math.round(distance)} 米，超出了 250 米打卡范围。`;
+                    alert(`不在打卡范围内！\n您当前距离永安锦苑7栋约 ${Math.round(distance)} 米（限定 250 米内）。`);
+                    return;
+                }
+
+                // 距离符合要求，提交打卡
+                tip.textContent = '📍 定位验证通过，正在提交打卡...';
+                const { data: { user } } = await sbClient.auth.getUser();
+                const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
+                
+                if (error) { 
+                    tip.style.color = '#dc2626'; 
+                    tip.textContent = '打卡失败: ' + error.message; 
+                } else { 
+                    tip.style.color = '#16a34a'; 
+                    tip.textContent = `🎉 打卡成功！（定位校验通过：距离 ${Math.round(distance)}米）`; 
+                    checkHolidayAndAttendance(); 
+                    loadHistory(); 
+                }
+            }, (error) => {
+                console.error('定位获取失败:', error);
+                tip.style.color = '#dc2626';
+                let errMsg = '定位失败';
+                if (error.code === 1) errMsg = '用户拒绝了定位权限，请在浏览器设置中允许定位。';
+                else if (error.code === 2) errMsg = '无法获取位置信息（GPS 信号弱）。';
+                else if (error.code === 3) errMsg = '定位超时。';
+                alert('打卡失败：' + errMsg);
+                tip.textContent = '打卡失败: ' + errMsg;
+            }, { timeout: 10000, enableHighAccuracy: true });
         });
 
         async function loadHistory() {
@@ -521,7 +584,7 @@
             loadAdminLeaves();
             loadAdminAttendance();
             loadAdminAnnouncements();
-            analyzeAttendanceData(); // 加载考勤分析
+            analyzeAttendanceData();
         }
 
         document.getElementById('refreshAttendanceBtn').addEventListener('click', () => {
@@ -535,7 +598,7 @@
             alert('考勤数据分析完成！');
         });
 
-        // 💡 核心功能：智能考勤分析工具
+        // 智能考勤分析规则（上班 09:00 前含，下班 18:00 后含）
         async function analyzeAttendanceData() {
             try {
                 const { data: records, error } = await sbClient.from('attendance').select('*').limit(100);
@@ -556,7 +619,7 @@
 
                 let totalCount = records.length;
                 let normalCount = 0;
-                let lateCount = 0;
+                let abnormalCount = 0;
 
                 const analysisRows = records.map(r => {
                     const fullName = profileMap[r.user_id] || profileMap[r.id] || '未知员工';
@@ -566,19 +629,29 @@
                     const timeStr = dateObj ? dateObj.toLocaleString() : '未知时间';
 
                     let statusBadge = '<span class="badge-normal">正常</span>';
+                    let isNormal = true;
 
-                    // 智能判断迟到：如果是上班打卡（'in'），且时间超过上午 09:05，则判定为迟到
-                    if (r.clock_type === 'in' && dateObj) {
+                    if (dateObj) {
                         const hours = dateObj.getHours();
                         const minutes = dateObj.getMinutes();
-                        if (hours > 9 || (hours === 9 && minutes > 5)) {
-                            statusBadge = '<span class="badge-late">迟到</span>';
-                            lateCount++;
-                        } else {
-                            normalCount++;
+                        const seconds = dateObj.getSeconds();
+                        const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+
+                        if (r.clock_type === 'in') {
+                            if (totalSeconds > 9 * 3600) isNormal = false; // 超过 09:00:00 为异常
+                        } else if (r.clock_type === 'out') {
+                            if (totalSeconds < 18 * 3600) isNormal = false; // 早于 18:00:00 为异常
                         }
                     } else {
+                        isNormal = false;
+                    }
+
+                    if (isNormal) {
                         normalCount++;
+                        statusBadge = '<span class="badge-normal">正常</span>';
+                    } else {
+                        abnormalCount++;
+                        statusBadge = '<span class="badge-abnormal">异常</span>';
                     }
 
                     return `
@@ -591,12 +664,9 @@
                     `;
                 });
 
-                // 更新统计数字看板
                 document.getElementById('statTotal').textContent = totalCount;
                 document.getElementById('statNormal').textContent = normalCount;
-                document.getElementById('statLate').textContent = lateCount;
-
-                // 渲染分析表格
+                document.getElementById('statLate').textContent = abnormalCount;
                 document.getElementById('adminAttendanceAnalysisList').innerHTML = analysisRows.length > 0 ? analysisRows.join('') : '<tr><td colspan="4">暂无考勤数据可分析</td></tr>';
             } catch (err) {
                 console.error('考勤分析异常:', err);
