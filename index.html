@@ -190,7 +190,7 @@
 
             <!-- 1. 管理员发布通知 -->
             <div class="card">
-                <h3>📢 发布公司通知</h3>
+                <h3>📢 发布与管理公司通知</h3>
                 <div class="input-group">
                     <input type="text" id="announcementTitleInput" placeholder="请输入通知标题（例如：关于国庆放假的通知）">
                 </div>
@@ -199,6 +199,17 @@
                 </div>
                 <button id="publishAnnouncementBtn" style="background: #f59e0b;">📤 立即发布通知</button>
                 <p id="announcementResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
+                
+                <!-- 已发布通知列表与删除管理 -->
+                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top: 1px solid #f1f5f9; padding-top: 12px;">已发布的历史通知：</h4>
+                <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>标题与内容</th><th>发布时间</th><th>操作</th></tr>
+                        </thead>
+                        <tbody id="adminAnnouncementList"><tr><td colspan="3">加载中...</td></tr></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- 2. 全公司实时打卡记录监控 -->
@@ -471,6 +482,7 @@
             loadAdminUsers();
             loadAdminLeaves();
             loadAdminAttendance();
+            loadAdminAnnouncements();
         }
 
         document.getElementById('refreshAttendanceBtn').addEventListener('click', () => {
@@ -495,8 +507,38 @@
                 tip.textContent = '🎉 通知发布成功！所有员工将实时在公告栏看到。';
                 document.getElementById('announcementTitleInput').value = '';
                 document.getElementById('announcementContentInput').value = '';
+                loadAdminAnnouncements();
             }
         });
+
+        async function loadAdminAnnouncements() {
+            const { data, error } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false });
+            const tbody = document.getElementById('adminAnnouncementList');
+            if (error || !data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">暂无已发布的通知</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td><strong>${item.title}</strong><br><span style="color: var(--text-secondary); font-size: 12px;">${item.content}</span></td>
+                    <td>${new Date(item.created_at).toLocaleString()}</td>
+                    <td class="action-btns">
+                        <button class="btn-danger" onclick="deleteAnnouncement('${item.id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.deleteAnnouncement = async (id) => {
+            if (!confirm('确定要删除这条通知吗？删除后员工端将不再显示。')) return;
+            const { error } = await sbClient.from('announcements').delete().eq('id', id);
+            if (error) {
+                alert('删除失败: ' + error.message);
+            } else {
+                alert('通知已删除！');
+                loadAdminAnnouncements();
+            }
+        };
 
         async function loadAdminUsers() {
             const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false });
@@ -507,8 +549,8 @@
                     <td>${new Date(u.created_at).toLocaleString()}</td>
                     <td>${u.is_approved ? '<span class="badge-approved">已批准</span>' : '<span class="badge-pending">待审批</span>'}</td>
                     <td class="action-btns">
-                        ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id}')">批准</button>` : ''}
-                        <button class="btn-danger" onclick="deleteUser('${u.id}')">删除</button>
+                        ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id || u.user_id}')">批准</button>` : ''}
+                        <button class="btn-danger" onclick="deleteUser('${u.id || u.user_id}')">删除</button>
                     </td>
                 </tr>
             `).join('');
@@ -526,7 +568,7 @@
             loadAdminUsers();
         };
 
-        // 管理员加载请假审批列表
+        // 管理员加载请假审批列表（已完美兼容多字段名映射姓名）
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient
@@ -543,16 +585,17 @@
                 const profileMap = {};
                 if (profiles) {
                     profiles.forEach(p => {
-                        const pid = p.id || p.user_id;
+                        const pid = p.id || p.user_id || p.uid;
+                        const name = p.full_name || p.name || p.username || '未命名员工';
                         if (pid) {
-                            profileMap[pid] = p.full_name || p.name || '未命名员工';
+                            profileMap[pid] = name;
                         }
                     });
                 }
 
                 const tbody = document.getElementById('adminLeaveList');
                 tbody.innerHTML = leaves.map(l => {
-                    const fullName = profileMap[l.user_id] || '未知员工';
+                    const fullName = profileMap[l.user_id] || profileMap[l.id] || '未知员工';
                     const statusClass = l.status === '已批准' ? 'approved' : l.status === '已拒绝' ? 'rejected' : 'pending';
                     const startStr = l.start_date ? l.start_date.slice(0,10) : '';
                     const endStr = l.end_date ? l.end_date.slice(0,10) : '';
@@ -588,7 +631,7 @@
                 const { data: records, error } = await sbClient
                     .from('attendance')
                     .select('*')
-                    .order('created_at', { ascending: false })
+                    .order('clock_in_time', { ascending: false })
                     .limit(20);
 
                 if (error) {
@@ -606,9 +649,10 @@
                 const profileMap = {};
                 if (profiles) {
                     profiles.forEach(p => {
-                        const pid = p.id || p.user_id;
+                        const pid = p.id || p.user_id || p.uid;
+                        const name = p.full_name || p.name || p.username || '未命名员工';
                         if (pid) {
-                            profileMap[pid] = p.full_name || p.name || '未命名员工';
+                            profileMap[pid] = name;
                         }
                     });
                 }
@@ -617,7 +661,7 @@
                 tbody.innerHTML = records.map(r => {
                     const fullName = profileMap[r.user_id] || profileMap[r.id] || '未知员工';
                     const typeText = r.clock_type === 'in' ? '🟢 上班打卡' : '🔴 下班打卡';
-                    const timeField = r.clock_in_time || r.created_at || r.clock_time;
+                    const timeField = r.clock_in_time || r.clock_time;
                     const timeStr = timeField ? new Date(timeField).toLocaleString() : '未知时间';
                     return `
                         <tr>
@@ -638,7 +682,7 @@
                 const { data: records, error: recError } = await sbClient
                     .from('attendance')
                     .select('*')
-                    .order('created_at', { ascending: false });
+                    .order('clock_in_time', { ascending: false });
 
                 if (recError || !records || records.length === 0) { 
                     alert('暂无考勤数据可导出'); 
@@ -649,17 +693,18 @@
                 const profileMap = {};
                 if (profiles) {
                     profiles.forEach(p => {
-                        const pid = p.id || p.user_id;
+                        const pid = p.id || p.user_id || p.uid;
+                        const name = p.full_name || p.name || p.username || '未知员工';
                         if (pid) {
-                            profileMap[pid] = p.full_name || p.name || '未知员工';
+                            profileMap[pid] = name;
                         }
                     });
                 }
 
                 const excelData = records.map(item => ({
-                    '员工姓名': profileMap[item.user_id] || '未知员工',
+                    '员工姓名': profileMap[item.user_id] || profileMap[item.id] || '未知员工',
                     '打卡类型': item.clock_type === 'in' ? '上班打卡' : '下班打卡',
-                    '打卡时间': new Date(item.clock_in_time || item.created_at).toLocaleString()
+                    '打卡时间': new Date(item.clock_in_time || item.clock_time).toLocaleString()
                 }));
 
                 const worksheet = XLSX.utils.json_to_sheet(excelData);
