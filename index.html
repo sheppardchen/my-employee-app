@@ -255,8 +255,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co'
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI'
+        const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
 
         const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
@@ -264,143 +264,143 @@
                 autoRefreshToken: true,
                 detectSessionInUrl: true
             }
-        })
+        });
 
-        const loginSection = document.getElementById('loginSection')
-        const registerSection = document.getElementById('registerSection')
-        const pendingSection = document.getElementById('pendingSection')
-        const dashboardSection = document.getElementById('dashboardSection')
-        const adminSection = document.getElementById('adminSection')
+        const loginSection = document.getElementById('loginSection');
+        const registerSection = document.getElementById('registerSection');
+        const pendingSection = document.getElementById('pendingSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const adminSection = document.getElementById('adminSection');
 
-        let currentClockState = 'in'
-        let sHolidayToday = false
+        let currentClockState = 'in';
+        let sHolidayToday = false;
 
         // 页面加载时自动恢复持久化登录状态
         window.addEventListener('DOMContentLoaded', async () => {
             try {
-                const { data: { session }, error: sessionError } = await sbClient.auth.getSession()
-                if (sessionError || !session || !session.user) return
+                const { data: { session }, error: sessionError } = await sbClient.auth.getSession();
+                if (sessionError || !session || !session.user) return;
 
-                const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single()
-                if (profileError || !profile) return
+                const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single();
+                if (profileError || !profile) return;
 
                 if (!profile.is_approved) {
-                    loginSection.style.display = 'none'
-                    pendingSection.style.display = 'block'
-                    return
+                    loginSection.style.display = 'none';
+                    pendingSection.style.display = 'block';
+                    return;
                 }
 
-                loginSection.style.display = 'none'
+                loginSection.style.display = 'none';
                 if (profile.role === 'admin') {
-                    adminSection.style.display = 'block'
-                    loadAdminData()
+                    adminSection.style.display = 'block';
+                    loadAdminData();
                 } else {
-                    dashboardSection.style.display = 'block'
-                    document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`
-                    loadEmployeeData()
+                    dashboardSection.style.display = 'block';
+                    document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`;
+                    loadEmployeeData();
                 }
             } catch (err) {
-                console.error('自动恢复登录状态异常:', err)
+                console.error('自动恢复登录状态异常:', err);
             }
-        })
+        });
 
-        document.getElementById('toRegisterBtn').addEventListener('click', () => { loginSection.style.display = 'none'; registerSection.style.display = 'block'; })
-        document.getElementById('toLoginBtn').addEventListener('click', () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; })
-        document.getElementById('backToLoginBtn').addEventListener('click', () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; })
+        document.getElementById('toRegisterBtn').addEventListener('click', () => { loginSection.style.display = 'none'; registerSection.style.display = 'block'; });
+        document.getElementById('toLoginBtn').addEventListener('click', () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; });
+        document.getElementById('backToLoginBtn').addEventListener('click', () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; });
 
         // 注册
         document.getElementById('registerBtn').addEventListener('click', async () => {
-            const name = document.getElementById('regName').value.trim()
-            const email = document.getElementById('regEmail').value.trim()
-            const password = document.getElementById('regPassword').value.trim()
-            const confirmPassword = document.getElementById('regConfirmPassword').value.trim()
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
 
             if (!name || !email || !password || !confirmPassword) { alert('请完整填写！'); return; }
             if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
             if (password.length < 6) { alert('密码至少6位！'); return; }
 
-            const { error: authError } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } })
+            const { error: authError } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
             if (authError) { alert('注册失败: ' + authError.message); } 
             else {
-                alert('🎉 注册申请已提交！等待管理员审批。')
+                alert('🎉 注册申请已提交！等待管理员审批。');
                 registerSection.style.display = 'none'; pendingSection.style.display = 'block';
             }
-        })
+        });
 
         // 登录分流
         document.getElementById('loginBtn').addEventListener('click', async () => {
-            const email = document.getElementById('loginEmail').value.trim()
-            const password = document.getElementById('loginPassword').value.trim()
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
             if (!email || !password) { alert('请填写邮箱和密码！'); return; }
 
-            const { data, error } = await sbClient.auth.signInWithPassword({ email, password })
+            const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) { alert('登录失败: ' + error.message); return; }
 
-            const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single()
+            const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single();
             if (profileError || !profile) { alert('未找到员工档案'); await sbClient.auth.signOut(); return; }
 
             if (!profile.is_approved) {
-                await sbClient.auth.signOut()
+                await sbClient.auth.signOut();
                 loginSection.style.display = 'none'; pendingSection.style.display = 'block';
-                return
+                return;
             }
 
-            loginSection.style.display = 'none'
+            loginSection.style.display = 'none';
             if (profile.role === 'admin') {
-                adminSection.style.display = 'block'
-                loadAdminData()
+                adminSection.style.display = 'block';
+                loadAdminData();
             } else {
-                dashboardSection.style.display = 'block'
-                document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`
-                loadEmployeeData()
+                dashboardSection.style.display = 'block';
+                document.getElementById('welcomeUser').textContent = `欢迎您，${profile.full_name}`;
+                loadEmployeeData();
             }
-        })
+        });
 
-        const logoutHandler = async () => { await sbClient.auth.signOut(); location.reload(); }
-        document.getElementById('logoutBtn').addEventListener('click', logoutHandler)
-        document.getElementById('adminLogoutBtn').addEventListener('click', logoutHandler)
+        const logoutHandler = async () => { await sbClient.auth.signOut(); location.reload(); };
+        document.getElementById('logoutBtn').addEventListener('click', logoutHandler);
+        document.getElementById('adminLogoutBtn').addEventListener('click', logoutHandler);
 
         // 员工端数据加载
         function loadEmployeeData() {
-            loadAnnouncements()
-            checkHolidayAndAttendance()
-            loadHistory()
-            loadLeaveHistory()
+            loadAnnouncements();
+            checkHolidayAndAttendance();
+            loadHistory();
+            loadLeaveHistory();
         }
 
         async function loadAnnouncements() {
-            const { data } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false }).limit(3)
-            document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:14px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span>${i.content}</span></div>`).join('')
+            const { data } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false }).limit(3);
+            document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:14px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span>${i.content}</span></div>`).join('');
         }
 
         async function checkHolidayAndAttendance() {
-            const now = new Date()
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-            let isHoliday = (now.getDay() === 0 || now.getDay() === 6)
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            let isHoliday = (now.getDay() === 0 || now.getDay() === 6);
             try {
-                const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${now.getFullYear()}/CN`)
+                const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${now.getFullYear()}/CN`);
                 if (res.ok) {
-                    const holidays = await res.json()
-                    if (holidays.find(h => h.date === todayStr)) isHoliday = true
+                    const holidays = await res.json();
+                    if (holidays.find(h => h.date === todayStr)) isHoliday = true;
                 }
             } catch(e){}
 
-            sHolidayToday = isHoliday
-            const banner = document.getElementById('holidayBanner')
-            const btn = document.getElementById('clockBtn')
+            sHolidayToday = isHoliday;
+            const banner = document.getElementById('holidayBanner');
+            const btn = document.getElementById('clockBtn');
             if (isHoliday) {
-                banner.style.display = 'block'; banner.textContent = '🏖️ 今日是节假日/周末，无需打卡！'
-                btn.textContent = '今日放假'; btn.style.background = '#94a3b8'; btn.disabled = true; return
+                banner.style.display = 'block'; banner.textContent = '🏖️ 今日是节假日/周末，无需打卡！';
+                btn.textContent = '今日放假'; btn.style.background = '#94a3b8'; btn.disabled = true; return;
             }
-            banner.style.display = 'none'
+            banner.style.display = 'none';
 
-            const { data: { user } } = await sbClient.auth.getUser()
-            const todayStart = new Date(); todayStart.setHours(0,0,0,0)
-            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', todayStart.toISOString())
+            const { data: { user } } = await sbClient.auth.getUser();
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', todayStart.toISOString());
             
-            const hasIn = records?.some(r => r.clock_type === 'in')
-            const hasOut = records?.some(r => r.clock_type === 'out')
-            const tip = document.getElementById('clockResult')
+            const hasIn = records?.some(r => r.clock_type === 'in');
+            const hasOut = records?.some(r => r.clock_type === 'out');
+            const tip = document.getElementById('clockResult');
 
             if (!hasIn) { currentClockState = 'in'; btn.textContent = '🟢 上班打卡 (09:00)'; btn.style.background = '#2563eb'; btn.disabled = false; }
             else if (!hasOut) { currentClockState = 'out'; btn.textContent = '🔵 下班打卡 (18:00)'; btn.style.background = '#0d9488'; btn.disabled = false; tip.textContent = '✅ 已完成上班打卡'; }
@@ -408,29 +408,29 @@
         }
 
         document.getElementById('clockBtn').addEventListener('click', async () => {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }])
-            const tip = document.getElementById('clockResult')
+            const { data: { user } } = await sbClient.auth.getUser();
+            const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
+            const tip = document.getElementById('clockResult');
             if (error) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
             else { tip.style.color = '#16a34a'; tip.textContent = '🎉 打卡成功！'; checkHolidayAndAttendance(); loadHistory(); }
-        })
+        });
 
         async function loadHistory() {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5)
-            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('')
+            const { data: { user } } = await sbClient.auth.getUser();
+            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5);
+            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('');
         }
 
-        // 提交请假申请（完美适配数据库真实字段：request_type, start_date, end_date）
+        // 提交请假申请
         document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
-            const { data: { user } } = await sbClient.auth.getUser()
+            const { data: { user } } = await sbClient.auth.getUser();
             if (!user) { alert('用户未登录！'); return; }
 
-            const type = document.getElementById('leaveType').value
-            const start = document.getElementById('startDate').value
-            const end = document.getElementById('endDate').value
-            const reason = document.getElementById('leaveReason').value.trim()
-            const tip = document.getElementById('leaveResult')
+            const type = document.getElementById('leaveType').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const reason = document.getElementById('leaveReason').value.trim();
+            const tip = document.getElementById('leaveResult');
 
             if (!start || !end) { alert('请选择起止日期'); return; }
 
@@ -442,9 +442,9 @@
                 request_type: type, 
                 start_date: startIso, 
                 end_date: endIso, 
-                reason, 
+                reason: reason || '无', 
                 status: '待审批' 
-            }])
+            }]);
 
             if (error) { 
                 tip.style.color = '#dc2626'; 
@@ -457,49 +457,49 @@
                 document.getElementById('leaveReason').value = '';
                 loadLeaveHistory(); 
             }
-        })
+        });
 
         async function loadLeaveHistory() {
-            const { data: { user } } = await sbClient.auth.getUser()
-            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
-            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date.slice(0,10)}至${i.end_date.slice(0,10)} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('')
+            const { data: { user } } = await sbClient.auth.getUser();
+            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5);
+            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date ? i.start_date.slice(0,10) : ''}至${i.end_date ? i.end_date.slice(0,10) : ''} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('');
         }
 
         // 管理员端数据与操作
         function loadAdminData() {
-            loadAdminUsers()
-            loadAdminLeaves()
-            loadAdminAttendance()
+            loadAdminUsers();
+            loadAdminLeaves();
+            loadAdminAttendance();
         }
 
         document.getElementById('refreshAttendanceBtn').addEventListener('click', () => {
-            loadAdminAttendance()
-            alert('打卡记录已刷新！')
-        })
+            loadAdminAttendance();
+            alert('打卡记录已刷新！');
+        });
 
         // 管理员发布通知逻辑
         document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
-            const title = document.getElementById('announcementTitleInput').value.trim()
-            const content = document.getElementById('announcementContentInput').value.trim()
-            const tip = document.getElementById('announcementResult')
+            const title = document.getElementById('announcementTitleInput').value.trim();
+            const content = document.getElementById('announcementContentInput').value.trim();
+            const tip = document.getElementById('announcementResult');
 
             if (!title || !content) { alert('请填写通知标题和内容！'); return; }
 
-            const { error } = await sbClient.from('announcements').insert([{ title, content }])
+            const { error } = await sbClient.from('announcements').insert([{ title, content }]);
             if (error) {
-                tip.style.color = '#dc2626'
-                tip.textContent = '发布失败: ' + error.message
+                tip.style.color = '#dc2626';
+                tip.textContent = '发布失败: ' + error.message;
             } else {
-                tip.style.color = '#16a34a'
-                tip.textContent = '🎉 通知发布成功！所有员工将实时在公告栏看到。'
-                document.getElementById('announcementTitleInput').value = ''
-                document.getElementById('announcementContentInput').value = ''
+                tip.style.color = '#16a34a';
+                tip.textContent = '🎉 通知发布成功！所有员工将实时在公告栏看到。';
+                document.getElementById('announcementTitleInput').value = '';
+                document.getElementById('announcementContentInput').value = '';
             }
-        })
+        });
 
         async function loadAdminUsers() {
-            const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false })
-            const tbody = document.getElementById('adminUserList')
+            const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false });
+            const tbody = document.getElementById('adminUserList');
             tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">暂无员工</td></tr>' : data.map(u => `
                 <tr>
                     <td>${u.full_name}</td>
@@ -510,22 +510,22 @@
                         <button class="btn-danger" onclick="deleteUser('${u.id}')">删除</button>
                     </td>
                 </tr>
-            `).join('')
+            `).join('');
         }
 
         window.approveUser = async (id) => {
-            await sbClient.from('profiles').update({ is_approved: true }).eq('id', id)
-            alert('已批准该员工！')
-            loadAdminUsers()
-        }
+            await sbClient.from('profiles').update({ is_approved: true }).eq('id', id);
+            alert('已批准该员工！');
+            loadAdminUsers();
+        };
 
         window.deleteUser = async (id) => {
             if (!confirm('确定删除该员工档案吗？')) return;
-            await sbClient.from('profiles').delete().eq('id', id)
-            loadAdminUsers()
-        }
+            await sbClient.from('profiles').delete().eq('id', id);
+            loadAdminUsers();
+        };
 
-        // 管理员加载请假审批列表（适配 request_type）
+        // 管理员加载请假审批列表
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient
@@ -551,7 +551,7 @@
                     const endStr = l.end_date ? l.end_date.slice(0,10) : '';
                     return `
                         <tr>
-                            <td>${fullName} (${l.request_type})</td>
+                            <td>${fullName} (${l.request_type || '请假'})</td>
                             <td>${startStr} ~ ${endStr}</td>
                             <td>${l.reason || '无'}</td>
                             <td><span class="badge-${statusClass}">${l.status}</span></td>
@@ -568,10 +568,10 @@
         }
 
         window.updateLeave = async (id, status) => {
-            await sbClient.from('leave_requests').update({ status }).eq('id', id)
-            alert(`已更新状态为：${status}`)
-            loadAdminLeaves()
-        }
+            await sbClient.from('leave_requests').update({ status }).eq('id', id);
+            alert(`已更新状态为：${status}`);
+            loadAdminLeaves();
+        };
 
         // 管理员加载全公司实时打卡记录
         async function loadAdminAttendance() {
@@ -612,20 +612,20 @@
 
         // Excel 导出考勤报表
         document.getElementById('exportExcelBtn').addEventListener('click', async () => {
-            const { data, error } = await sbClient.from('attendance').select('*, profiles(full_name)').order('clock_in_time', { ascending: false })
+            const { data, error } = await sbClient.from('attendance').select('*, profiles(full_name)').order('clock_in_time', { ascending: false });
             if (error || !data || data.length === 0) { alert('暂无考勤数据可导出'); return; }
 
             const excelData = data.map(item => ({
                 '员工姓名': item.profiles?.full_name || '未知',
                 '打卡类型': item.clock_type === 'in' ? '上班打卡' : '下班打卡',
                 '打卡时间': new Date(item.clock_in_time).toLocaleString()
-            }))
+            }));
 
-            const worksheet = XLSX.utils.json_to_sheet(excelData)
-            const workbook = XLSX.utils.book_new()
-            XLSX.utils.book_append_sheet(workbook, worksheet, "考勤明细")
-            XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`)
-        })
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "考勤明细");
+            XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
     </script>
     <script>
       if ('serviceWorker' in navigator) {
