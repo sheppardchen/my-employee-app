@@ -97,6 +97,7 @@
         .badge-rejected { color: #dc2626; font-weight: bold; }
         .badge-abnormal { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
         .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
+        .badge-leave { color: #2563eb; font-weight: bold; background: #dbeafe; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 20px; max-height: 150px; overflow-y: auto; margin: 0; font-size: 14px; color: var(--text-secondary); }
         li { margin-bottom: 6px; }
@@ -162,7 +163,7 @@
                 <div id="holidayBanner" class="holiday-banner">🏖️今天是法定节假日/周末，无需打卡！</div>
                 <button id="clockBtn">正在检查节假日与打卡状态...</button>
                 <p id="clockResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
-                <h4 style="font-size:14px; margin:12px 0 6px 0;">我的近期打卡记录：</h4>
+                <h4 style="font-size:14px; margin:12px 0 6px 0;">我的近期考勤/打卡/请假记录：</h4>
                 <ul id="historyList"><li>加载中...</li></ul>
             </div>
 
@@ -223,15 +224,15 @@
                     <span>📈 智能考勤分析与统计</span>
                     <button id="analyzeAttendanceBtn" class="btn-sm" style="background: #10b981;">📊 刷新分析</button>
                 </h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">规则：上班 09:00 前正常，下班 18:00 后正常，其余异常。</p>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">规则：上班 09:00 前正常，下班 18:00 后正常，已批准请假为准假记录。</p>
                 
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡人次</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡/考勤人次</div>
                         <div id="statTotal" class="stat-num">0</div>
                     </div>
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">正常考勤</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">正常/请假考勤</div>
                         <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
                     </div>
                     <div class="stat-box">
@@ -243,7 +244,7 @@
                 <div style="overflow-x: auto; max-height: 220px; overflow-y: auto;">
                     <table>
                         <thead>
-                            <tr><th>员工姓名</th><th>打卡类型</th><th>打卡时间点</th><th>考勤状态</th></tr>
+                            <tr><th>员工姓名</th><th>考勤类型</th><th>时间段 / 打卡点</th><th>考勤状态</th></tr>
                         </thead>
                         <tbody id="adminAttendanceAnalysisList"><tr><td colspan="4">点击上方按钮或刷新加载分析...</td></tr></tbody>
                     </table>
@@ -253,14 +254,14 @@
             <!-- 3. 全公司实时打卡记录监控 -->
             <div class="card" style="border: 2px solid #3b82f6;">
                 <h3>
-                    <span>⚡ 全公司实时打卡监控</span>
+                    <span>⚡ 全公司考勤打卡动态监控</span>
                     <button id="refreshAttendanceBtn" class="btn-sm" style="background: #2563eb;">🔄 刷新打卡</button>
                 </h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">实时展示全公司员工最近的上下班打卡动态。</p>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">实时展示全公司员工最近的上下班打卡及批准请假动态。</p>
                 <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
                     <table>
                         <thead>
-                            <tr><th>员工姓名</th><th>打卡类型</th><th>打卡时间</th></tr>
+                            <tr><th>员工姓名</th><th>考勤类型</th><th>记录时间</th></tr>
                         </thead>
                         <tbody id="adminAttendanceList"><tr><td colspan="3">加载中...</td></tr></tbody>
                     </table>
@@ -280,13 +281,13 @@
                 </div>
             </div>
 
-            <!-- 5. 员工请假审批 -->
+            <!-- 5. 员工请假审批（包含数据同步入考勤表） -->
             <div class="card">
                 <h3>📋 员工请假审批</h3>
                 <div style="overflow-x: auto;">
                     <table>
                         <thead>
-                            <tr><th>类型</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr>
+                            <tr><th>姓名(类型)</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr>
                         </thead>
                         <tbody id="adminLeaveList"><tr><td colspan="5">加载中...</td></tr></tbody>
                     </table>
@@ -296,7 +297,7 @@
             <!-- 6. 考勤数据与导出 -->
             <div class="card">
                 <h3>📊 全公司考勤报表导出</h3>
-                <p style="font-size: 13px; color: var(--text-secondary);">支持一键导出所有员工的打卡历史明细至 Excel 表格，方便人事核算薪资。</p>
+                <p style="font-size: 13px; color: var(--text-secondary);">支持一键导出所有员工的打卡历史明细及批准请假记录至 Excel 表格。</p>
                 <button id="exportExcelBtn" style="background: #059669;">📥 导出考勤报表为 Excel</button>
             </div>
         </div>
@@ -315,7 +316,7 @@
             }
         });
 
-        // 📍 公司打卡地理围栏配置（浙江省温州市龙湾区瑶溪街道永安锦苑7栋，限定 250米）
+        // 📍 公司打卡地理围栏配置（永安锦苑7栋，限定 250米）
         const COMPANY_LOCATION = {
             latitude: 27.935600,
             longitude: 120.785000,
@@ -331,7 +332,6 @@
         let currentClockState = 'in';
         let sHolidayToday = false;
 
-        // 页面加载时自动恢复持久化登录状态
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 const { data: { session }, error: sessionError } = await sbClient.auth.getSession();
@@ -364,7 +364,7 @@
         document.getElementById('toLoginBtn').addEventListener('click', () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; });
         document.getElementById('backToLoginBtn').addEventListener('click', () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; });
 
-        // 注册申请
+        // 注册
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
@@ -383,7 +383,7 @@
             }
         });
 
-        // 登录分流
+        // 登录
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
@@ -416,7 +416,6 @@
         document.getElementById('logoutBtn').addEventListener('click', logoutHandler);
         document.getElementById('adminLogoutBtn').addEventListener('click', logoutHandler);
 
-        // 员工端数据加载
         function loadEmployeeData() {
             loadAnnouncements();
             checkHolidayAndAttendance();
@@ -463,7 +462,6 @@
             else { btn.textContent = '✨ 今日考勤已完成'; btn.style.background = '#cbd5e1'; btn.disabled = true; tip.textContent = '🎉 今日两次打卡均已完成！'; }
         }
 
-        // 计算两点经纬度之间的距离（返回单位：米）
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371000;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -475,7 +473,6 @@
             return R * c;
         }
 
-        // 点击打卡校验 250米 地理围栏
         document.getElementById('clockBtn').addEventListener('click', async () => {
             const tip = document.getElementById('clockResult');
             tip.style.color = '#2563eb';
@@ -516,21 +513,30 @@
                 console.error('定位获取失败:', error);
                 tip.style.color = '#dc2626';
                 let errMsg = '定位失败';
-                if (error.code === 1) errMsg = '用户拒绝了定位权限，请在浏览器设置中允许定位。';
-                else if (error.code === 2) errMsg = '无法获取位置信息（GPS 信号弱）。';
+                if (error.code === 1) errMsg = '用户拒绝了定位权限。';
+                else if (error.code === 2) errMsg = '无法获取位置信息。';
                 else if (error.code === 3) errMsg = '定位超时。';
                 alert('打卡失败：' + errMsg);
                 tip.textContent = '打卡失败: ' + errMsg;
             }, { timeout: 10000, enableHighAccuracy: true });
         });
 
+        // 加载包含请假与常规打卡的考勤记录
         async function loadHistory() {
             const { data: { user } } = await sbClient.auth.getUser();
-            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).limit(5);
-            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time || i.clock_time).toLocaleString()}</li>`).join('');
+            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).limit(10);
+            
+            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无考勤记录</li>' : data.map(i => {
+                let label = '🟢 上班打卡';
+                if (i.clock_type === 'out') label = '🔴 下班打卡';
+                else if (i.clock_type && i.clock_type.startsWith('请假')) label = `🌴 ${i.clock_type}`;
+                
+                const timeStr = new Date(i.clock_in_time || i.clock_time).toLocaleString();
+                return `<li>${label} — ${timeStr}</li>`;
+            }).join('');
         }
 
-        // 提交请假申请
+        // 提交请假
         document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
             const { data: { user } } = await sbClient.auth.getUser();
             if (!user) { alert('用户未登录！'); return; }
@@ -575,7 +581,6 @@
             document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date ? i.start_date.slice(0,10) : ''}至${i.end_date ? i.end_date.slice(0,10) : ''} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('');
         }
 
-        // 管理员端数据与操作
         function loadAdminData() {
             loadAdminUsers();
             loadAdminLeaves();
@@ -587,7 +592,7 @@
         document.getElementById('refreshAttendanceBtn').addEventListener('click', () => {
             loadAdminAttendance();
             analyzeAttendanceData();
-            alert('打卡记录已刷新并完成分析！');
+            alert('打卡与考勤记录已刷新！');
         });
 
         document.getElementById('analyzeAttendanceBtn').addEventListener('click', () => {
@@ -595,7 +600,7 @@
             alert('考勤数据分析完成！');
         });
 
-        // 智能考勤分析规则（上班 09:00 前含，下班 18:00 后含）
+        // 智能考勤分析（增加请假正常判定）
         async function analyzeAttendanceData() {
             try {
                 const { data: records, error } = await sbClient.from('attendance').select('*').limit(100);
@@ -620,7 +625,9 @@
 
                 const analysisRows = records.map(r => {
                     const fullName = profileMap[r.user_id] || profileMap[r.id] || '未知员工';
-                    const typeText = r.clock_type === 'in' ? '🟢 上班打卡' : '🔴 下班打卡';
+                    const isLeave = r.clock_type && r.clock_type.startsWith('请假');
+                    
+                    let typeText = r.clock_type === 'in' ? '🟢 上班打卡' : (r.clock_type === 'out' ? '🔴 下班打卡' : `🌴 ${r.clock_type}`);
                     const timeField = r.clock_in_time || r.clock_time;
                     const dateObj = timeField ? new Date(timeField) : null;
                     const timeStr = dateObj ? dateObj.toLocaleString() : '未知时间';
@@ -628,7 +635,10 @@
                     let statusBadge = '<span class="badge-normal">正常</span>';
                     let isNormal = true;
 
-                    if (dateObj) {
+                    if (isLeave) {
+                        isNormal = true;
+                        statusBadge = '<span class="badge-leave">已批准请假</span>';
+                    } else if (dateObj) {
                         const hours = dateObj.getHours();
                         const minutes = dateObj.getMinutes();
                         const seconds = dateObj.getSeconds();
@@ -639,17 +649,14 @@
                         } else if (r.clock_type === 'out') {
                             if (totalSeconds < 18 * 3600) isNormal = false;
                         }
+                        statusBadge = isNormal ? '<span class="badge-normal">正常</span>' : '<span class="badge-abnormal">异常</span>';
                     } else {
                         isNormal = false;
-                    }
-
-                    if (isNormal) {
-                        normalCount++;
-                        statusBadge = '<span class="badge-normal">正常</span>';
-                    } else {
-                        abnormalCount++;
                         statusBadge = '<span class="badge-abnormal">异常</span>';
                     }
+
+                    if (isNormal) normalCount++;
+                    else abnormalCount++;
 
                     return `
                         <tr>
@@ -670,7 +677,7 @@
             }
         }
 
-        // 管理员发布通知逻辑
+        // 监控公告
         document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
             const title = document.getElementById('announcementTitleInput').value.trim();
             const content = document.getElementById('announcementContentInput').value.trim();
@@ -714,14 +721,10 @@
         }
 
         window.deleteAnnouncement = async (id) => {
-            if (!confirm('确定要删除这条通知吗？删除后员工端将不再显示。')) return;
+            if (!confirm('确定要删除这条通知吗？')) return;
             const { error } = await sbClient.from('announcements').delete().eq('id', id);
-            if (error) {
-                alert('删除失败: ' + error.message);
-            } else {
-                alert('通知已删除！');
-                loadAdminAnnouncements();
-            }
+            if (error) alert('删除失败: ' + error.message);
+            else { alert('通知已删除！'); loadAdminAnnouncements(); }
         };
 
         async function loadAdminUsers() {
@@ -759,7 +762,6 @@
             }).join('');
         }
 
-        // 💡 完善的审批操作：同时同步更新 is_approved (bool) 与 status (text)
         window.reviewUser = async (id, action) => {
             const isApproved = (action === '批准');
             const statusText = isApproved ? '已批准' : '已拒绝';
@@ -769,29 +771,18 @@
                 status: statusText
             }).eq('id', id);
 
-            if (error) {
-                alert('操作失败: ' + error.message);
-            } else {
-                alert(`已成功设为：${statusText}`);
-                loadAdminUsers();
-            }
+            if (error) alert('操作失败: ' + error.message);
+            else { alert(`已成功设为：${statusText}`); loadAdminUsers(); }
         };
 
-        // 通过安全的 RPC 存储过程绕过权限拦截删除
         window.deleteUserRPC = async (id) => {
-            if (!confirm('确定要彻底删除该申请人的注册信息吗？删除后不可恢复。')) return;
-            
+            if (!confirm('确定要彻底删除该申请人的注册信息吗？')) return;
             const { error } = await sbClient.rpc('delete_user_profile', { target_id: id });
-            
-            if (error) {
-                alert('删除失败: ' + error.message);
-            } else {
-                alert('申请人记录已成功删除！');
-                loadAdminUsers();
-            }
+            if (error) alert('删除失败: ' + error.message);
+            else { alert('申请人记录已成功删除！'); loadAdminUsers(); }
         };
 
-        // 管理员加载请假审批列表
+        // 加载请假列表
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient.from('leave_requests').select('*');
@@ -826,8 +817,8 @@
                             <td>${l.reason || '无'}</td>
                             <td><span class="badge-${statusClass}">${l.status}</span></td>
                             <td class="action-btns">
-                                <button class="btn-success" ${isProcessed ? 'disabled' : ''} onclick="updateLeave('${l.id}', '已批准')">批准</button>
-                                <button class="btn-danger" ${isProcessed ? 'disabled' : ''} onclick="updateLeave('${l.id}', '已拒绝')">拒绝</button>
+                                <button class="btn-success" ${isProcessed ? 'disabled' : ''} onclick="updateLeave('${l.id}', '${l.user_id}', '${l.request_type}', '${startStr}', '${endStr}', '已批准')">批准</button>
+                                <button class="btn-danger" ${isProcessed ? 'disabled' : ''} onclick="updateLeave('${l.id}', '${l.user_id}', '${l.request_type}', '${startStr}', '${endStr}', '已拒绝')">拒绝</button>
                             </td>
                         </tr>
                     `;
@@ -837,19 +828,43 @@
             }
         }
 
-        window.updateLeave = async (id, status) => {
-            await sbClient.from('leave_requests').update({ status }).eq('id', id);
-            alert(`已更新状态为：${status}`);
+        // 💡 重点功能升级：请假批准后，自动把请假记录插入到考勤 (attendance) 表中！
+        window.updateLeave = async (leaveId, userId, leaveType, startStr, endStr, status) => {
+            // 1. 更新请假单状态
+            const { error: updateError } = await sbClient.from('leave_requests').update({ status }).eq('id', leaveId);
+            
+            if (updateError) {
+                alert('更新请假状态失败: ' + updateError.message);
+                return;
+            }
+
+            // 2. 如果是批准，自动插入考勤记录
+            if (status === '已批准') {
+                const leaveClockType = `请假(${leaveType}: ${startStr}至${endStr})`;
+                const { error: attError } = await sbClient.from('attendance').insert([{
+                    user_id: userId,
+                    clock_type: leaveClockType,
+                    clock_in_time: new Date().toISOString()
+                }]);
+
+                if (attError) {
+                    console.error('写入考勤记录异常:', attError);
+                }
+            }
+
+            alert(`已更新请假状态为：${status}${status === '已批准' ? '，并已同步写入考勤报表！' : ''}`);
             loadAdminLeaves();
+            loadAdminAttendance();
+            analyzeAttendanceData();
         };
 
-        // 管理员加载全公司实时打卡记录
+        // 全公司打卡/请假实时监控
         async function loadAdminAttendance() {
             try {
                 const { data: records, error } = await sbClient.from('attendance').select('*').limit(50);
 
                 if (error || !records || records.length === 0) {
-                    document.getElementById('adminAttendanceList').innerHTML = '<tr><td colspan="3">暂无打卡记录</td></tr>';
+                    document.getElementById('adminAttendanceList').innerHTML = '<tr><td colspan="3">暂无考勤/打卡记录</td></tr>';
                     return;
                 }
 
@@ -866,7 +881,7 @@
                 const tbody = document.getElementById('adminAttendanceList');
                 tbody.innerHTML = records.map(r => {
                     const fullName = profileMap[r.user_id] || profileMap[r.id] || '未知员工';
-                    const typeText = r.clock_type === 'in' ? '🟢 上班打卡' : '🔴 下班打卡';
+                    let typeText = r.clock_type === 'in' ? '🟢 上班打卡' : (r.clock_type === 'out' ? '🔴 下班打卡' : `🌴 ${r.clock_type}`);
                     const timeField = r.clock_in_time || r.clock_time;
                     const timeStr = timeField ? new Date(timeField).toLocaleString() : '未知时间';
                     return `
@@ -882,7 +897,7 @@
             }
         }
 
-        // Excel 导出考勤报表
+        // Excel 导出 (包含请假考勤明细)
         document.getElementById('exportExcelBtn').addEventListener('click', async () => {
             try {
                 const { data: records, error: recError } = await sbClient.from('attendance').select('*');
@@ -902,16 +917,19 @@
                     });
                 }
 
-                const excelData = records.map(item => ({
-                    '员工姓名': profileMap[item.user_id] || profileMap[item.id] || '未知员工',
-                    '打卡类型': item.clock_type === 'in' ? '上班打卡' : '下班打卡',
-                    '打卡时间': new Date(item.clock_in_time || item.clock_time).toLocaleString()
-                }));
+                const excelData = records.map(item => {
+                    let typeName = item.clock_type === 'in' ? '上班打卡' : (item.clock_type === 'out' ? '下班打卡' : item.clock_type);
+                    return {
+                        '员工姓名': profileMap[item.user_id] || profileMap[item.id] || '未知员工',
+                        '考勤/打卡类型': typeName,
+                        '记录时间': new Date(item.clock_in_time || item.clock_time).toLocaleString()
+                    };
+                });
 
                 const worksheet = XLSX.utils.json_to_sheet(excelData);
                 const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "考勤明细");
-                XLSX.writeFile(workbook, `企业考勤报表_${new Date().toISOString().slice(0,10)}.xlsx`);
+                XLSX.utils.book_append_sheet(workbook, worksheet, "全员考勤明细");
+                XLSX.writeFile(workbook, `企业全员考勤与请假明细表_${new Date().toISOString().slice(0,10)}.xlsx`);
             } catch (err) {
                 console.error('导出 Excel 异常:', err);
                 alert('导出失败，请检查控制台错误信息');
