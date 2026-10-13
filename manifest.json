@@ -1,18 +1,13 @@
-{
-  "name": "员工管理系统",
-  "short_name": "员工管理",
+﻿{
+  "name": "企业员工自助服务系统",
+  "short_name": "员工门户",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2196F3",
+  "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
       "sizes": "512x512",
       "type": "image/png"
     }
