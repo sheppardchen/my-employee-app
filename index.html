@@ -267,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- 4. 新员工审核 -->
+            <!-- 4. 新员工注册审核（支持批准/拒绝/变灰及拒绝后删除） -->
             <div class="card">
                 <h3>👥 新员工注册审核</h3>
                 <div style="overflow-x: auto;">
@@ -315,7 +315,7 @@
             }
         });
 
-        // 📍 公司打卡地理围栏配置（浙江省温州市龙湾区瑶溪街道永安锦苑7栋，范围缩减为 250米）
+        // 📍 公司打卡地理围栏配置（浙江省温州市龙湾区瑶溪街道永安锦苑7栋，限定 250米）
         const COMPANY_LOCATION = {
             latitude: 27.935600,   // 中心纬度
             longitude: 120.785000, // 中心经度
@@ -340,7 +340,7 @@
                 const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single();
                 if (profileError || !profile) return;
 
-                if (!profile.is_approved) {
+                if (!profile.is_approved && profile.status !== '已批准') {
                     loginSection.style.display = 'none';
                     pendingSection.style.display = 'block';
                     return;
@@ -364,7 +364,7 @@
         document.getElementById('toLoginBtn').addEventListener('click', () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; });
         document.getElementById('backToLoginBtn').addEventListener('click', () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; });
 
-        // 注册
+        // 注册申请
         document.getElementById('registerBtn').addEventListener('click', async () => {
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
@@ -395,7 +395,7 @@
             const { data: profile, error: profileError } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single();
             if (profileError || !profile) { alert('未找到员工档案'); await sbClient.auth.signOut(); return; }
 
-            if (!profile.is_approved) {
+            if (!profile.is_approved && profile.status !== '已批准') {
                 await sbClient.auth.signOut();
                 loginSection.style.display = 'none'; pendingSection.style.display = 'block';
                 return;
@@ -465,7 +465,7 @@
 
         // 计算两点经纬度之间的距离（返回单位：米）
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // 地球半径（米）
+            const R = 6371000;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -475,7 +475,7 @@
             return R * c;
         }
 
-        // 📍 点击打卡：校验 250米 地理围栏
+        // 点击打卡校验 250米 地理围栏
         document.getElementById('clockBtn').addEventListener('click', async () => {
             const tip = document.getElementById('clockResult');
             tip.style.color = '#2563eb';
@@ -490,8 +490,6 @@
             navigator.geolocation.getCurrentPosition(async (position) => {
                 const userLat = position.coords.latitude;
                 const userLon = position.coords.longitude;
-
-                // 计算与永安锦苑7栋的距离（米）
                 const distance = calculateDistance(userLat, userLon, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
 
                 if (distance > COMPANY_LOCATION.maxDistance) {
@@ -501,7 +499,6 @@
                     return;
                 }
 
-                // 距离符合要求，提交打卡
                 tip.textContent = '📍 定位验证通过，正在提交打卡...';
                 const { data: { user } } = await sbClient.auth.getUser();
                 const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
@@ -638,9 +635,9 @@
                         const totalSeconds = hours * 3600 + minutes * 60 + seconds;
 
                         if (r.clock_type === 'in') {
-                            if (totalSeconds > 9 * 3600) isNormal = false; // 超过 09:00:00 为异常
+                            if (totalSeconds > 9 * 3600) isNormal = false;
                         } else if (r.clock_type === 'out') {
-                            if (totalSeconds < 18 * 3600) isNormal = false; // 早于 18:00:00 为异常
+                            if (totalSeconds < 18 * 3600) isNormal = false;
                         }
                     } else {
                         isNormal = false;
@@ -727,32 +724,71 @@
             }
         };
 
+        // 💡 重点改进：新员工注册审核管理（批准 / 拒绝 变灰，拒绝后显示删除）
         async function loadAdminUsers() {
             const { data } = await sbClient.from('profiles').select('*');
             const tbody = document.getElementById('adminUserList');
-            tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">暂无员工</td></tr>' : data.map(u => `
-                <tr>
-                    <td>${u.full_name}</td>
-                    <td>${u.clock_in_time ? new Date(u.clock_in_time).toLocaleString() : '注册用户'}</td>
-                    <td>${u.is_approved ? '<span class="badge-approved">已批准</span>' : '<span class="badge-pending">待审批</span>'}</td>
-                    <td class="action-btns">
-                        ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id || u.user_id}')">批准</button>` : ''}
-                        <button class="btn-danger" onclick="deleteUser('${u.id || u.user_id}')">删除</button>
-                    </td>
-                </tr>
-            `).join('');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">暂无员工注册记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(u => {
+                const uid = u.id || u.user_id;
+                const regTime = u.clock_in_time || u.created_at ? new Date(u.clock_in_time || u.created_at).toLocaleString() : '注册用户';
+                
+                // 判断状态：is_approved为true 或 status为'已批准'
+                let isApproved = u.is_approved || u.status === '已批准';
+                let isRejected = u.status === '已拒绝';
+                let isProcessed = isApproved || isRejected;
+
+                let statusBadge = '<span class="badge-pending">待审批</span>';
+                if (isApproved) statusBadge = '<span class="badge-approved">已批准</span>';
+                if (isRejected) statusBadge = '<span class="badge-rejected">已拒绝</span>';
+
+                return `
+                    <tr>
+                        <td>${u.full_name || '未命名'}</td>
+                        <td>${regTime}</td>
+                        <td>${statusBadge}</td>
+                        <td class="action-btns">
+                            <button class="btn-success" ${isProcessed ? 'disabled' : ''} onclick="reviewUser('${uid}', '批准')">批准</button>
+                            <button class="btn-danger" ${isProcessed ? 'disabled' : ''} onclick="reviewUser('${uid}', '拒绝')">拒绝</button>
+                            ${isRejected ? `<button class="btn-danger" style="background:#b91c1c;" onclick="deleteUser('${uid}')">删除</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
-        window.approveUser = async (id) => {
-            await sbClient.from('profiles').update({ is_approved: true }).eq('id', id);
-            alert('已批准该员工！');
-            loadAdminUsers();
+        // 处理新员工审核（批准/拒绝）
+        window.reviewUser = async (id, action) => {
+            const isApproved = (action === '批准');
+            const statusText = isApproved ? '已批准' : '已拒绝';
+
+            const { error } = await sbClient.from('profiles').update({ 
+                is_approved: isApproved,
+                status: statusText
+            }).eq('id', id);
+
+            if (error) {
+                alert('操作失败: ' + error.message);
+            } else {
+                alert(`已成功设为：${statusText}`);
+                loadAdminUsers();
+            }
         };
 
+        // 彻底删除已被拒绝的申请人记录
         window.deleteUser = async (id) => {
-            if (!confirm('确定删除该员工档案吗？')) return;
-            await sbClient.from('profiles').delete().eq('id', id);
-            loadAdminUsers();
+            if (!confirm('确定要彻底删除该申请人的注册信息吗？删除后不可恢复。')) return;
+            const { error } = await sbClient.from('profiles').delete().eq('id', id);
+            if (error) {
+                alert('删除失败: ' + error.message);
+            } else {
+                alert('申请人记录已成功删除！');
+                loadAdminUsers();
+            }
         };
 
         // 管理员加载请假审批列表
