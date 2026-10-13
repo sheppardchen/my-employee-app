@@ -95,6 +95,8 @@
         .badge-pending { color: #d97706; font-weight: bold; }
         .badge-approved { color: #16a34a; font-weight: bold; }
         .badge-rejected { color: #dc2626; font-weight: bold; }
+        .badge-late { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
+        .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 20px; max-height: 150px; overflow-y: auto; margin: 0; font-size: 14px; color: var(--text-secondary); }
         li { margin-bottom: 6px; }
@@ -105,6 +107,10 @@
         .btn-success { background: #10b981; }
         .btn-danger { background: #ef4444; }
         .btn-sm { width: auto; padding: 4px 10px; font-size: 12px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+        .stat-box { background: #f1f5f9; padding: 12px; border-radius: 8px; text-align: center; }
+        .stat-num { font-size: 18px; font-weight: bold; color: var(--primary-color); margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -200,7 +206,6 @@
                 <button id="publishAnnouncementBtn" style="background: #f59e0b;">📤 立即发布通知</button>
                 <p id="announcementResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
                 
-                <!-- 已发布通知列表与删除管理 -->
                 <h4 style="font-size:14px; margin:16px 0 8px 0; border-top: 1px solid #f1f5f9; padding-top: 12px;">📋 已发布的通知管理：</h4>
                 <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
                     <table>
@@ -212,7 +217,40 @@
                 </div>
             </div>
 
-            <!-- 2. 全公司实时打卡记录监控 -->
+            <!-- 2. 智能考勤分析工具 -->
+            <div class="card" style="border: 2px solid #10b981;">
+                <h3>
+                    <span>📈 智能考勤分析与统计</span>
+                    <button id="analyzeAttendanceBtn" class="btn-sm" style="background: #10b981;">📊 刷新分析</button>
+                </h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 0;">自动分析全公司打卡数据，识别迟到情况与员工出勤频次。</p>
+                
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡人次</div>
+                        <div id="statTotal" class="stat-num">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">正常上班</div>
+                        <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">迟到/异常</div>
+                        <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto; max-height: 220px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>员工姓名</th><th>打卡类型</th><th>打卡时间点</th><th>考勤状态</th></tr>
+                        </thead>
+                        <tbody id="adminAttendanceAnalysisList"><tr><td colspan="4">点击上方按钮或刷新加载分析...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. 全公司实时打卡记录监控 -->
             <div class="card" style="border: 2px solid #3b82f6;">
                 <h3>
                     <span>⚡ 全公司实时打卡监控</span>
@@ -229,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- 3. 新员工审核 -->
+            <!-- 4. 新员工审核 -->
             <div class="card">
                 <h3>👥 新员工注册审核</h3>
                 <div style="overflow-x: auto;">
@@ -242,7 +280,7 @@
                 </div>
             </div>
 
-            <!-- 4. 员工请假审批 -->
+            <!-- 5. 员工请假审批 -->
             <div class="card">
                 <h3>📋 员工请假审批</h3>
                 <div style="overflow-x: auto;">
@@ -255,7 +293,7 @@
                 </div>
             </div>
 
-            <!-- 5. 考勤数据与导出 -->
+            <!-- 6. 考勤数据与导出 -->
             <div class="card">
                 <h3>📊 全公司考勤报表导出</h3>
                 <p style="font-size: 13px; color: var(--text-secondary);">支持一键导出所有员工的打卡历史明细至 Excel 表格，方便人事核算薪资。</p>
@@ -380,7 +418,7 @@
         }
 
         async function loadAnnouncements() {
-            const { data } = await sbClient.from('announcements').select('*').order('clock_in_time', { ascending: false }).limit(3); // 兼容
+            const { data } = await sbClient.from('announcements').select('*').limit(3);
             document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:14px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span>${i.content}</span></div>`).join('');
         }
 
@@ -428,8 +466,8 @@
 
         async function loadHistory() {
             const { data: { user } } = await sbClient.auth.getUser();
-            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5);
-            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('');
+            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).limit(5);
+            document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time || i.clock_time).toLocaleString()}</li>`).join('');
         }
 
         // 提交请假申请
@@ -473,7 +511,7 @@
 
         async function loadLeaveHistory() {
             const { data: { user } } = await sbClient.auth.getUser();
-            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5);
+            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).limit(5);
             document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date ? i.start_date.slice(0,10) : ''}至${i.end_date ? i.end_date.slice(0,10) : ''} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('');
         }
 
@@ -483,12 +521,87 @@
             loadAdminLeaves();
             loadAdminAttendance();
             loadAdminAnnouncements();
+            analyzeAttendanceData(); // 加载考勤分析
         }
 
         document.getElementById('refreshAttendanceBtn').addEventListener('click', () => {
             loadAdminAttendance();
-            alert('打卡记录已刷新！');
+            analyzeAttendanceData();
+            alert('打卡记录已刷新并完成分析！');
         });
+
+        document.getElementById('analyzeAttendanceBtn').addEventListener('click', () => {
+            analyzeAttendanceData();
+            alert('考勤数据分析完成！');
+        });
+
+        // 💡 核心功能：智能考勤分析工具
+        async function analyzeAttendanceData() {
+            try {
+                const { data: records, error } = await sbClient.from('attendance').select('*').limit(100);
+                if (error || !records) {
+                    document.getElementById('adminAttendanceAnalysisList').innerHTML = '<tr><td colspan="4" style="color:red;">分析数据加载失败</td></tr>';
+                    return;
+                }
+
+                const { data: profiles } = await sbClient.from('profiles').select('*');
+                const profileMap = {};
+                if (profiles) {
+                    profiles.forEach(p => {
+                        const pid = p.id || p.user_id || p.uid;
+                        const name = p.full_name || p.name || p.username || '未命名员工';
+                        if (pid) profileMap[pid] = name;
+                    });
+                }
+
+                let totalCount = records.length;
+                let normalCount = 0;
+                let lateCount = 0;
+
+                const analysisRows = records.map(r => {
+                    const fullName = profileMap[r.user_id] || profileMap[r.id] || '未知员工';
+                    const typeText = r.clock_type === 'in' ? '🟢 上班打卡' : '🔴 下班打卡';
+                    const timeField = r.clock_in_time || r.clock_time;
+                    const dateObj = timeField ? new Date(timeField) : null;
+                    const timeStr = dateObj ? dateObj.toLocaleString() : '未知时间';
+
+                    let statusBadge = '<span class="badge-normal">正常</span>';
+
+                    // 智能判断迟到：如果是上班打卡（'in'），且时间超过上午 09:05，则判定为迟到
+                    if (r.clock_type === 'in' && dateObj) {
+                        const hours = dateObj.getHours();
+                        const minutes = dateObj.getMinutes();
+                        if (hours > 9 || (hours === 9 && minutes > 5)) {
+                            statusBadge = '<span class="badge-late">迟到</span>';
+                            lateCount++;
+                        } else {
+                            normalCount++;
+                        }
+                    } else {
+                        normalCount++;
+                    }
+
+                    return `
+                        <tr>
+                            <td>${fullName}</td>
+                            <td>${typeText}</td>
+                            <td>${timeStr}</td>
+                            <td>${statusBadge}</td>
+                        </tr>
+                    `;
+                });
+
+                // 更新统计数字看板
+                document.getElementById('statTotal').textContent = totalCount;
+                document.getElementById('statNormal').textContent = normalCount;
+                document.getElementById('statLate').textContent = lateCount;
+
+                // 渲染分析表格
+                document.getElementById('adminAttendanceAnalysisList').innerHTML = analysisRows.length > 0 ? analysisRows.join('') : '<tr><td colspan="4">暂无考勤数据可分析</td></tr>';
+            } catch (err) {
+                console.error('考勤分析异常:', err);
+            }
+        }
 
         // 管理员发布通知逻辑
         document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
@@ -511,7 +624,6 @@
             }
         });
 
-        // 加载管理员端的通知列表
         async function loadAdminAnnouncements() {
             try {
                 const { data, error } = await sbClient.from('announcements').select('*');
@@ -576,9 +688,7 @@
         // 管理员加载请假审批列表
         async function loadAdminLeaves() {
             try {
-                const { data: leaves, error: leaveError } = await sbClient
-                    .from('leave_requests')
-                    .select('*');
+                const { data: leaves, error: leaveError } = await sbClient.from('leave_requests').select('*');
 
                 if (leaveError || !leaves || leaves.length === 0) {
                     document.getElementById('adminLeaveList').innerHTML = '<tr><td colspan="5">暂无请假申请</td></tr>';
@@ -591,9 +701,7 @@
                     profiles.forEach(p => {
                         const pid = p.id || p.user_id || p.uid;
                         const name = p.full_name || p.name || p.username || '未命名员工';
-                        if (pid) {
-                            profileMap[pid] = name;
-                        }
+                        if (pid) profileMap[pid] = name;
                     });
                 }
 
@@ -629,21 +737,12 @@
             loadAdminLeaves();
         };
 
-        // 管理员加载全公司实时打卡记录（完全移除有风险的排序字段）
+        // 管理员加载全公司实时打卡记录
         async function loadAdminAttendance() {
             try {
-                const { data: records, error } = await sbClient
-                    .from('attendance')
-                    .select('*')
-                    .limit(50);
+                const { data: records, error } = await sbClient.from('attendance').select('*').limit(50);
 
-                if (error) {
-                    console.error('获取打卡记录出错:', error.message);
-                    document.getElementById('adminAttendanceList').innerHTML = `<tr><td colspan="3" style="color:red;">加载失败: ${error.message}</td></tr>`;
-                    return;
-                }
-
-                if (!records || records.length === 0) {
+                if (error || !records || records.length === 0) {
                     document.getElementById('adminAttendanceList').innerHTML = '<tr><td colspan="3">暂无打卡记录</td></tr>';
                     return;
                 }
@@ -654,9 +753,7 @@
                     profiles.forEach(p => {
                         const pid = p.id || p.user_id || p.uid;
                         const name = p.full_name || p.name || p.username || '未命名员工';
-                        if (pid) {
-                            profileMap[pid] = name;
-                        }
+                        if (pid) profileMap[pid] = name;
                     });
                 }
 
@@ -682,9 +779,7 @@
         // Excel 导出考勤报表
         document.getElementById('exportExcelBtn').addEventListener('click', async () => {
             try {
-                const { data: records, error: recError } = await sbClient
-                    .from('attendance')
-                    .select('*');
+                const { data: records, error: recError } = await sbClient.from('attendance').select('*');
 
                 if (recError || !records || records.length === 0) { 
                     alert('暂无考勤数据可导出'); 
@@ -697,9 +792,7 @@
                     profiles.forEach(p => {
                         const pid = p.id || p.user_id || p.uid;
                         const name = p.full_name || p.name || p.username || '未命名员工';
-                        if (pid) {
-                            profileMap[pid] = name;
-                        }
+                        if (pid) profileMap[pid] = name;
                     });
                 }
 
