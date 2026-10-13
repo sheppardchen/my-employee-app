@@ -421,7 +421,7 @@
             document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => `<li>${i.clock_type === 'in' ? '🟢 上班' : '🔴 下班'} — ${new Date(i.clock_in_time).toLocaleString()}</li>`).join('')
         }
 
-        // 提交请假申请（已修正字段名以匹配你的数据库：leave_type, start_date, end_date）
+        // 提交请假申请（完美适配数据库真实字段：request_type, start_date, end_date）
         document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
             const { data: { user } } = await sbClient.auth.getUser()
             if (!user) { alert('用户未登录！'); return; }
@@ -434,11 +434,14 @@
 
             if (!start || !end) { alert('请选择起止日期'); return; }
 
+            const startIso = new Date(start + 'T00:00:00').toISOString();
+            const endIso = new Date(end + 'T23:59:59').toISOString();
+
             const { error } = await sbClient.from('leave_requests').insert([{ 
                 user_id: user.id, 
-                leave_type: type, 
-                start_date: start, 
-                end_date: end, 
+                request_type: type, 
+                start_date: startIso, 
+                end_date: endIso, 
                 reason, 
                 status: '待审批' 
             }])
@@ -459,7 +462,7 @@
         async function loadLeaveHistory() {
             const { data: { user } } = await sbClient.auth.getUser()
             const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
-            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.leave_type}] ${i.start_date}至${i.end_date} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('')
+            document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date.slice(0,10)}至${i.end_date.slice(0,10)} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('')
         }
 
         // 管理员端数据与操作
@@ -522,7 +525,7 @@
             loadAdminUsers()
         }
 
-        // 管理员加载请假审批列表（解耦版）
+        // 管理员加载请假审批列表（适配 request_type）
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient
@@ -544,10 +547,12 @@
                 tbody.innerHTML = leaves.map(l => {
                     const fullName = profileMap[l.user_id] || '未知员工';
                     const statusClass = l.status === '已批准' ? 'approved' : l.status === '已拒绝' ? 'rejected' : 'pending';
+                    const startStr = l.start_date ? l.start_date.slice(0,10) : '';
+                    const endStr = l.end_date ? l.end_date.slice(0,10) : '';
                     return `
                         <tr>
-                            <td>${fullName} (${l.leave_type})</td>
-                            <td>${l.start_date} ~ ${l.end_date}</td>
+                            <td>${fullName} (${l.request_type})</td>
+                            <td>${startStr} ~ ${endStr}</td>
                             <td>${l.reason || '无'}</td>
                             <td><span class="badge-${statusClass}">${l.status}</span></td>
                             <td class="action-btns">
