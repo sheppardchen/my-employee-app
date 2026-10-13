@@ -188,9 +188,9 @@
                 <button class="logout-btn" id="adminLogoutBtn">退出登录</button>
             </div>
 
-            <!-- 1. 管理员发布通知 -->
+            <!-- 1. 管理员发布与管理通知 -->
             <div class="card">
-                <h3>📢 发布与管理公司通知</h3>
+                <h3>📢 发布公司通知</h3>
                 <div class="input-group">
                     <input type="text" id="announcementTitleInput" placeholder="请输入通知标题（例如：关于国庆放假的通知）">
                 </div>
@@ -201,7 +201,7 @@
                 <p id="announcementResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
                 
                 <!-- 已发布通知列表与删除管理 -->
-                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top: 1px solid #f1f5f9; padding-top: 12px;">已发布的历史通知：</h4>
+                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top: 1px solid #f1f5f9; padding-top: 12px;">📋 已发布的通知管理：</h4>
                 <div style="overflow-x: auto; max-height: 200px; overflow-y: auto;">
                     <table>
                         <thead>
@@ -380,7 +380,7 @@
         }
 
         async function loadAnnouncements() {
-            const { data } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false }).limit(3);
+            const { data } = await sbClient.from('announcements').select('*').order('clock_in_time', { ascending: false }).limit(3); // 兼容
             document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:14px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span>${i.content}</span></div>`).join('');
         }
 
@@ -473,7 +473,7 @@
 
         async function loadLeaveHistory() {
             const { data: { user } } = await sbClient.auth.getUser();
-            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5);
+            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).order('clock_in_time', { ascending: false }).limit(5);
             document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li>📌 [${i.request_type}] ${i.start_date ? i.start_date.slice(0,10) : ''}至${i.end_date ? i.end_date.slice(0,10) : ''} — <span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('');
         }
 
@@ -511,22 +511,27 @@
             }
         });
 
+        // 加载管理员端的通知列表
         async function loadAdminAnnouncements() {
-            const { data, error } = await sbClient.from('announcements').select('*').order('created_at', { ascending: false });
-            const tbody = document.getElementById('adminAnnouncementList');
-            if (error || !data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3">暂无已发布的通知</td></tr>';
-                return;
+            try {
+                const { data, error } = await sbClient.from('announcements').select('*');
+                const tbody = document.getElementById('adminAnnouncementList');
+                if (error || !data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3">暂无已发布的通知</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(item => `
+                    <tr>
+                        <td><strong>${item.title}</strong><br><span style="color: var(--text-secondary); font-size: 12px;">${item.content}</span></td>
+                        <td>${item.clock_in_time ? new Date(item.clock_in_time).toLocaleString() : '历史通知'}</td>
+                        <td class="action-btns">
+                            <button class="btn-danger" onclick="deleteAnnouncement('${item.id}')">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error('loadAdminAnnouncements 异常:', err);
             }
-            tbody.innerHTML = data.map(item => `
-                <tr>
-                    <td><strong>${item.title}</strong><br><span style="color: var(--text-secondary); font-size: 12px;">${item.content}</span></td>
-                    <td>${new Date(item.created_at).toLocaleString()}</td>
-                    <td class="action-btns">
-                        <button class="btn-danger" onclick="deleteAnnouncement('${item.id}')">删除</button>
-                    </td>
-                </tr>
-            `).join('');
         }
 
         window.deleteAnnouncement = async (id) => {
@@ -541,12 +546,12 @@
         };
 
         async function loadAdminUsers() {
-            const { data } = await sbClient.from('profiles').select('*').order('created_at', { ascending: false });
+            const { data } = await sbClient.from('profiles').select('*');
             const tbody = document.getElementById('adminUserList');
             tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">暂无员工</td></tr>' : data.map(u => `
                 <tr>
                     <td>${u.full_name}</td>
-                    <td>${new Date(u.created_at).toLocaleString()}</td>
+                    <td>${u.clock_in_time ? new Date(u.clock_in_time).toLocaleString() : '注册用户'}</td>
                     <td>${u.is_approved ? '<span class="badge-approved">已批准</span>' : '<span class="badge-pending">待审批</span>'}</td>
                     <td class="action-btns">
                         ${!u.is_approved ? `<button class="btn-success" onclick="approveUser('${u.id || u.user_id}')">批准</button>` : ''}
@@ -568,13 +573,12 @@
             loadAdminUsers();
         };
 
-        // 管理员加载请假审批列表（已完美兼容多字段名映射姓名）
+        // 管理员加载请假审批列表
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient
                     .from('leave_requests')
-                    .select('*')
-                    .order('created_at', { ascending: false });
+                    .select('*');
 
                 if (leaveError || !leaves || leaves.length === 0) {
                     document.getElementById('adminLeaveList').innerHTML = '<tr><td colspan="5">暂无请假申请</td></tr>';
@@ -625,14 +629,13 @@
             loadAdminLeaves();
         };
 
-        // 管理员加载全公司实时打卡记录
+        // 管理员加载全公司实时打卡记录（完全移除有风险的排序字段）
         async function loadAdminAttendance() {
             try {
                 const { data: records, error } = await sbClient
                     .from('attendance')
                     .select('*')
-                    .order('clock_in_time', { ascending: false })
-                    .limit(20);
+                    .limit(50);
 
                 if (error) {
                     console.error('获取打卡记录出错:', error.message);
@@ -681,8 +684,7 @@
             try {
                 const { data: records, error: recError } = await sbClient
                     .from('attendance')
-                    .select('*')
-                    .order('clock_in_time', { ascending: false });
+                    .select('*');
 
                 if (recError || !records || records.length === 0) { 
                     alert('暂无考勤数据可导出'); 
@@ -694,7 +696,7 @@
                 if (profiles) {
                     profiles.forEach(p => {
                         const pid = p.id || p.user_id || p.uid;
-                        const name = p.full_name || p.name || p.username || '未知员工';
+                        const name = p.full_name || p.name || p.username || '未命名员工';
                         if (pid) {
                             profileMap[pid] = name;
                         }
