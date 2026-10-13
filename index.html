@@ -267,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- 4. 新员工注册审核（支持批准/拒绝/变灰及拒绝后删除） -->
+            <!-- 4. 新员工注册审核 -->
             <div class="card">
                 <h3>👥 新员工注册审核</h3>
                 <div style="overflow-x: auto;">
@@ -317,9 +317,9 @@
 
         // 📍 公司打卡地理围栏配置（浙江省温州市龙湾区瑶溪街道永安锦苑7栋，限定 250米）
         const COMPANY_LOCATION = {
-            latitude: 27.935600,   // 中心纬度
-            longitude: 120.785000, // 中心经度
-            maxDistance: 250       // 允许打卡的最大半径（单位：米）
+            latitude: 27.935600,
+            longitude: 120.785000,
+            maxDistance: 250
         };
 
         const loginSection = document.getElementById('loginSection');
@@ -724,7 +724,6 @@
             }
         };
 
-        // 💡 重点改进：新员工注册审核管理（批准 / 拒绝 变灰，拒绝后显示删除）
         async function loadAdminUsers() {
             const { data } = await sbClient.from('profiles').select('*');
             const tbody = document.getElementById('adminUserList');
@@ -737,8 +736,7 @@
                 const uid = u.id || u.user_id;
                 const regTime = u.clock_in_time || u.created_at ? new Date(u.clock_in_time || u.created_at).toLocaleString() : '注册用户';
                 
-                // 判断状态：is_approved为true 或 status为'已批准'
-                let isApproved = u.is_approved || u.status === '已批准';
+                let isApproved = u.is_approved === true || u.status === '已批准';
                 let isRejected = u.status === '已拒绝';
                 let isProcessed = isApproved || isRejected;
 
@@ -754,14 +752,14 @@
                         <td class="action-btns">
                             <button class="btn-success" ${isProcessed ? 'disabled' : ''} onclick="reviewUser('${uid}', '批准')">批准</button>
                             <button class="btn-danger" ${isProcessed ? 'disabled' : ''} onclick="reviewUser('${uid}', '拒绝')">拒绝</button>
-                            ${isRejected ? `<button class="btn-danger" style="background:#b91c1c;" onclick="deleteUser('${uid}')">删除</button>` : ''}
+                            ${isRejected ? `<button class="btn-danger" style="background:#b91c1c;" onclick="deleteUserRPC('${uid}')">删除</button>` : ''}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // 处理新员工审核（批准/拒绝）
+        // 💡 重点改进：点击批准/拒绝时，同时精准同步更新 is_approved 与 status 列
         window.reviewUser = async (id, action) => {
             const isApproved = (action === '批准');
             const statusText = isApproved ? '已批准' : '已拒绝';
@@ -779,10 +777,12 @@
             }
         };
 
-        // 彻底删除已被拒绝的申请人记录
-        window.deleteUser = async (id) => {
+        // 通过安全的 RPC 存储过程绕过删除权限拦截
+        window.deleteUserRPC = async (id) => {
             if (!confirm('确定要彻底删除该申请人的注册信息吗？删除后不可恢复。')) return;
-            const { error } = await sbClient.from('profiles').delete().eq('id', id);
+            
+            const { error } = await sbClient.rpc('delete_user_profile', { target_id: id });
+            
             if (error) {
                 alert('删除失败: ' + error.message);
             } else {
