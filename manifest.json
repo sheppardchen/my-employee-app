@@ -2,10 +2,10 @@
   "background_color": "#ffffff",
   "dir": "ltr",
   "display": "standalone",
-  "name": "企业员工自助服务系统",
+  "name": "sheppardchen.github",
   "orientation": "any",
   "scope": "/",
-  "short_name": "员工门户",
+  "short_name": "sheppardchen.github",
   "start_url": "/",
   "theme_color": "#2196F3"
 }
