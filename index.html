@@ -45,6 +45,25 @@
             box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
         }
 
+        /* 品牌 Logo 样式配置 */
+        .brand-logo-large {
+            display: block;
+            max-height: 64px;
+            margin: 0 auto 16px auto;
+            object-fit: contain;
+        }
+        .brand-logo-small {
+            height: 32px;
+            object-fit: contain;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+
+        .brand-header-flex {
+            display: flex;
+            align-items: center;
+        }
+
         h2, h3 { margin-top: 0; color: var(--text-main); text-align: center; font-weight: 700; }
         h2 { font-size: 22px; margin-bottom: 18px; }
         h3 { 
@@ -176,6 +195,32 @@
 
         .flex-row { display: flex; gap: 10px; }
         .flex-row .input-group { flex: 1; }
+
+        /* 地图选点弹窗样式 */
+        #mapModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .map-modal-content {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        #amapContainer {
+            width: 100%;
+            height: 350px;
+            border-radius: 10px;
+            margin: 12px 0;
+            border: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
@@ -183,6 +228,8 @@
     <div class="container">
         <!-- 登录区域 -->
         <div id="loginSection" class="card" style="max-width:420px; margin: 40px auto;">
+            <!-- 嵌入 Logo 图标 -->
+            <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-large">
             <h2>🏢 企业员工登录</h2>
             <div class="input-group">
                 <label>工作邮箱</label>
@@ -198,6 +245,8 @@
 
         <!-- 注册区域 -->
         <div id="registerSection" class="card" style="display: none; max-width:420px; margin: 40px auto;">
+            <!-- 嵌入 Logo 图标 -->
+            <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-large">
             <h2>📝 员工注册申请</h2>
             <div class="input-group"><label>真实姓名</label><input type="text" id="regName" placeholder="例如：张三"></div>
             <div class="input-group"><label>工作邮箱</label><input type="email" id="regEmail" placeholder="name@company.com"></div>
@@ -209,6 +258,7 @@
 
         <!-- 待审核提示区域 -->
         <div id="pendingSection" class="card" style="display: none; text-align: center; max-width:420px; margin: 40px auto;">
+            <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-large">
             <h2 style="color: #d97706;">⏳ 账号正在审核中</h2>
             <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">您的注册申请已提交，请等待管理员审批后登录。</p>
             <button class="switch-btn" id="backToLoginBtn" type="button">返回登录页面</button>
@@ -217,7 +267,10 @@
         <!-- 员工主功能看板 -->
         <div id="dashboardSection" style="display: none;">
             <div class="welcome-bar">
-                <span id="welcomeUser"></span>
+                <div class="brand-header-flex">
+                    <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-small">
+                    <span id="welcomeUser">👋 欢迎回来</span>
+                </div>
                 <button class="logout-btn" id="logoutBtn" type="button">退出</button>
             </div>
 
@@ -228,7 +281,7 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <div class="location-pill">📍 永安锦苑7栋 (250米内)</div>
+                <div class="location-pill">📍 永安锦苑7栋考勤打卡</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
@@ -274,8 +327,29 @@
         <!-- 管理员控制台 -->
         <div id="adminSection" style="display: none;">
             <div class="welcome-bar" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #3730a3;">
-                <span>👑 管理员系统控制台</span>
+                <div class="brand-header-flex">
+                    <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-small">
+                    <span>👑 管理员系统控制台</span>
+                </div>
                 <button class="logout-btn" id="adminLogoutBtn" type="button">退出</button>
+            </div>
+
+            <!-- 地图选点修改定位配置面板 -->
+            <div class="card" style="border: 2px solid var(--primary-color);">
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (高德地图选点)</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">支持微信同款地图选点模式，修改后全员打卡基准点将立即更新。</p>
+                
+                <div class="flex-row">
+                    <div class="input-group">
+                        <label>当前基准纬度 (Latitude)</label>
+                        <input type="text" id="displayLat" value="27.952661" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label>当前基准经度 (Longitude)</label>
+                        <input type="text" id="displayLng" value="120.784334" readonly>
+                    </div>
+                </div>
+                <button id="openMapPickerBtn" type="button" style="background: #2563eb;">📍 开启地图选点 (类似微信发送位置)</button>
             </div>
 
             <!-- 1. 管理员补卡功能 -->
@@ -395,6 +469,20 @@
         </div>
     </div>
 
+    <!-- 高德地图选点弹窗 -->
+    <div id="mapModal">
+        <div class="map-modal-content">
+            <h3 style="margin:0 0 10px 0; border:none; padding:0;">📍 请在地图上点击或拖动选择公司打卡位置</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">点击地图任意位置即可锁定经纬度坐标。</p>
+            <div id="amapContainer"></div>
+            <div id="selectedAddrTip" style="font-size: 13px; font-weight: 600; color: #2563eb; margin-bottom: 12px;">已选坐标：暂未选择</div>
+            <div class="flex-row">
+                <button id="confirmMapBtn" type="button" style="background: #10b981;">✅ 确认使用此坐标</button>
+                <button id="closeMapBtn" type="button" style="background: #64748b;">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- 引入高德地图 JS API -->
@@ -409,8 +497,14 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            // 📍 目标位置：更新为东经 120.784334°，北纬 27.952661°（250米范围围栏）
-            const COMPANY_LOCATION = { latitude: 27.952661, longitude: 120.784334, maxDistance: 250 };
+            let savedLat = parseFloat(localStorage.getItem('company_lat')) || 27.952661;
+            let savedLng = parseFloat(localStorage.getItem('company_lng')) || 120.784334;
+            const COMPANY_LOCATION = { latitude: savedLat, longitude: savedLng, maxDistance: 650 };
+
+            const latInput = document.getElementById('displayLat');
+            const lngInput = document.getElementById('displayLng');
+            if(latInput) latInput.value = COMPANY_LOCATION.latitude;
+            if(lngInput) lngInput.value = COMPANY_LOCATION.longitude;
 
             const loginSection = document.getElementById('loginSection');
             const registerSection = document.getElementById('registerSection');
@@ -420,7 +514,6 @@
 
             let currentClockState = 'in';
 
-            // 实时数字时钟
             setInterval(() => {
                 const now = new Date();
                 const clockEl = document.getElementById('liveClock');
@@ -429,7 +522,6 @@
                 if (dateEl) dateEl.textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             }, 1000);
 
-            // 视图切换辅助函数
             function showSection(section) {
                 if(loginSection) loginSection.style.display = 'none';
                 if(registerSection) registerSection.style.display = 'none';
@@ -439,23 +531,13 @@
                 if(section) section.style.display = 'block';
             }
 
-            // 界面切换按钮事件绑定
             const toRegisterBtn = document.getElementById('toRegisterBtn');
-            if (toRegisterBtn) {
-                toRegisterBtn.onclick = function() { showSection(registerSection); };
-            }
-
+            if (toRegisterBtn) toRegisterBtn.onclick = () => showSection(registerSection);
             const toLoginBtn = document.getElementById('toLoginBtn');
-            if (toLoginBtn) {
-                toLoginBtn.onclick = function() { showSection(loginSection); };
-            }
-
+            if (toLoginBtn) toLoginBtn.onclick = () => showSection(loginSection);
             const backToLoginBtn = document.getElementById('backToLoginBtn');
-            if (backToLoginBtn) {
-                backToLoginBtn.onclick = function() { showSection(loginSection); };
-            }
+            if (backToLoginBtn) backToLoginBtn.onclick = () => showSection(loginSection);
 
-            // 检查已登录会话
             async function checkSession() {
                 try {
                     const { data: { session } } = await sbClient.auth.getSession();
@@ -484,7 +566,6 @@
             }
             checkSession();
 
-            // 注册处理
             const registerBtn = document.getElementById('registerBtn');
             if (registerBtn) {
                 registerBtn.onclick = async function() {
@@ -498,16 +579,11 @@
                     if (password.length < 6) { alert('密码至少需要 6 位！'); return; }
 
                     const { error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
-                    if (error) {
-                        alert('注册失败: ' + error.message);
-                    } else {
-                        alert('🎉 注册提交成功！请等待管理员审核。');
-                        showSection(pendingSection);
-                    }
+                    if (error) alert('注册失败: ' + error.message);
+                    else { alert('🎉 注册提交成功！请等待管理员审批。'); showSection(pendingSection); }
                 };
             }
 
-            // 登录处理
             const loginBtn = document.getElementById('loginBtn');
             if (loginBtn) {
                 loginBtn.onclick = async function() {
@@ -537,7 +613,6 @@
                 };
             }
 
-            // 退出登录
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) logoutBtn.onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
             const adminLogoutBtn = document.getElementById('adminLogoutBtn');
@@ -628,7 +703,6 @@
                 return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
             }
 
-            // 打卡按钮定位与逻辑
             const clockBtn = document.getElementById('clockBtn');
             if (clockBtn) {
                 clockBtn.onclick = async function() {
@@ -646,9 +720,9 @@
                                 if (distance > COMPANY_LOCATION.maxDistance) {
                                     if(tip) {
                                         tip.style.color = '#dc2626';
-                                        tip.textContent = `❌ 打卡超出范围：距离打卡点约 ${Math.round(distance)} 米`;
+                                        tip.textContent = '❌ 打卡失败：当前位置不在有效范围内';
                                     }
-                                    alert(`不在打卡范围内！\n您当前距离目标位置约 ${Math.round(distance)} 米（限定 250 米内）。`);
+                                    alert('不在打卡范围内！请前往公司指定打卡区域。');
                                     return;
                                 }
 
@@ -658,7 +732,7 @@
                                 if (error) { 
                                     if(tip) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
                                 } else {
-                                    if(tip) { tip.style.color = '#10b981'; tip.textContent = `🎉 打卡成功！（精准定位距离: ${Math.round(distance)}米）`; }
+                                    if(tip) { tip.style.color = '#10b981'; tip.textContent = '🎉 打卡成功！'; }
                                     checkHolidayAndAttendance(); 
                                     loadHistory();
                                 }
@@ -687,6 +761,65 @@
                         return `<li><span>${label}</span><span style="color:#64748b;">${timeStr}</span></li>`;
                     }).join('');
                 }
+            }
+
+            // 高德地图选点修改定位功能
+            let mapInstance = null;
+            let markerInstance = null;
+            let tempSelectedLat = COMPANY_LOCATION.latitude;
+            let tempSelectedLng = COMPANY_LOCATION.longitude;
+
+            const openMapPickerBtn = document.getElementById('openMapPickerBtn');
+            const mapModal = document.getElementById('mapModal');
+            const closeMapBtn = document.getElementById('closeMapBtn');
+            const confirmMapBtn = document.getElementById('confirmMapBtn');
+            const selectedAddrTip = document.getElementById('selectedAddrTip');
+
+            if (openMapPickerBtn) {
+                openMapPickerBtn.onclick = function() {
+                    mapModal.style.display = 'flex';
+                    setTimeout(() => {
+                        if (!mapInstance && window.AMap) {
+                            mapInstance = new AMap.Map('amapContainer', {
+                                zoom: 16,
+                                center: [COMPANY_LOCATION.longitude, COMPANY_LOCATION.latitude]
+                            });
+
+                            markerInstance = new AMap.Marker({
+                                position: [COMPANY_LOCATION.longitude, COMPANY_LOCATION.latitude],
+                                map: mapInstance
+                            });
+
+                            mapInstance.on('click', function(e) {
+                                tempSelectedLng = e.lnglat.getLng();
+                                tempSelectedLat = e.lnglat.getLat();
+                                markerInstance.setPosition([tempSelectedLng, tempSelectedLat]);
+                                selectedAddrTip.textContent = `已选坐标：经度 ${tempSelectedLng.toFixed(6)}, 纬度 ${tempSelectedLat.toFixed(6)}`;
+                            });
+                        } else if (mapInstance) {
+                            mapInstance.setCenter([COMPANY_LOCATION.longitude, COMPANY_LOCATION.latitude]);
+                            markerInstance.setPosition([COMPANY_LOCATION.longitude, COMPANY_LOCATION.latitude]);
+                        }
+                        selectedAddrTip.textContent = `当前基准坐标：经度 ${COMPANY_LOCATION.longitude}, 纬度 ${COMPANY_LOCATION.latitude}`;
+                    }, 200);
+                };
+            }
+
+            if (closeMapBtn) closeMapBtn.onclick = () => { mapModal.style.display = 'none'; };
+
+            if (confirmMapBtn) {
+                confirmMapBtn.onclick = () => {
+                    COMPANY_LOCATION.latitude = tempSelectedLat;
+                    COMPANY_LOCATION.longitude = tempSelectedLng;
+                    localStorage.setItem('company_lat', tempSelectedLat);
+                    localStorage.setItem('company_lng', tempSelectedLng);
+
+                    if(latInput) latInput.value = tempSelectedLat.toFixed(6);
+                    if(lngInput) lngInput.value = tempSelectedLng.toFixed(6);
+
+                    mapModal.style.display = 'none';
+                    alert(`📍 公司考勤打卡定位基准已成功更新！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}`);
+                };
             }
 
             // 请假提交
@@ -734,7 +867,6 @@
                 if (select && profiles) select.innerHTML = profiles.map(p => `<option value="${p.id || p.user_id}">${p.full_name || '未命名员工'}</option>`).join('');
             }
 
-            // 管理员补卡逻辑
             const submitManualClockBtn = document.getElementById('submitManualClockBtn');
             if (submitManualClockBtn) {
                 submitManualClockBtn.onclick = async function() {
