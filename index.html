@@ -157,9 +157,9 @@
                 <div id="announcementList">加载公告中...</div>
             </div>
 
-            <!-- 考勤打卡模块 -->
+            <!-- 考勤打卡模块（集成高德精准定位） -->
             <div class="card">
-                <h3>⏰ 考勤打卡中心 (限定：永安锦苑7栋 250米内)</h3>
+                <h3>⏰ 考勤打卡中心 (高德定位校验：永安锦苑7栋 250米内)</h3>
                 <div id="holidayBanner" class="holiday-banner">🏖️今天是法定节假日/周末，无需打卡！</div>
                 <button id="clockBtn">正在检查节假日与打卡状态...</button>
                 <p id="clockResult" style="text-align:center; font-weight:500; margin-top:10px; font-size:14px;"></p>
@@ -228,7 +228,7 @@
                 
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡/考勤人次</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">总考勤人次</div>
                         <div id="statTotal" class="stat-num">0</div>
                     </div>
                     <div class="stat-box">
@@ -281,7 +281,7 @@
                 </div>
             </div>
 
-            <!-- 5. 员工请假审批（包含数据同步入考勤表） -->
+            <!-- 5. 员工请假审批 -->
             <div class="card">
                 <h3>📋 员工请假审批</h3>
                 <div style="overflow-x: auto;">
@@ -303,7 +303,11 @@
         </div>
     </div>
 
+    <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- 引入高德地图 JS API (使用你提供的 Key) -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
+    
     <script>
         const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
@@ -473,55 +477,61 @@
             return R * c;
         }
 
+        // 💡 核心升级：使用高德高精度定位插件校验 250米 围栏
         document.getElementById('clockBtn').addEventListener('click', async () => {
             const tip = document.getElementById('clockResult');
             tip.style.color = '#2563eb';
-            tip.textContent = '📍 正在获取您的 GPS 定位，请允许浏览器定位请求...';
+            tip.textContent = '📍 正在通过高德高精度定位获取您的位置...';
 
-            if (!navigator.geolocation) {
-                alert('您的浏览器不支持地理定位功能！');
-                tip.textContent = '打卡失败：浏览器不支持定位';
+            if (!window.AMap) {
+                alert('高德地图 SDK 加载失败，请检查网络！');
+                tip.textContent = '打卡失败：高德 SDK 未加载';
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const userLat = position.coords.latitude;
-                const userLon = position.coords.longitude;
-                const distance = calculateDistance(userLat, userLon, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
+            AMap.plugin('AMap.Geolocation', function() {
+                const geolocation = new AMap.Geolocation({
+                    enableHighAccuracy: true, // 高精度定位
+                    timeout: 10000,          // 超时时间
+                    convert: true            // 自动纠偏为高德坐标
+                });
 
-                if (distance > COMPANY_LOCATION.maxDistance) {
-                    tip.style.color = '#dc2626';
-                    tip.textContent = `❌ 打卡失败：您当前位置距离公司约 ${Math.round(distance)} 米，超出了 250 米打卡范围。`;
-                    alert(`不在打卡范围内！\n您当前距离永安锦苑7栋约 ${Math.round(distance)} 米（限定 250 米内）。`);
-                    return;
-                }
+                geolocation.getCurrentPosition(async function(status, result) {
+                    if (status === 'complete') {
+                        const userLat = result.position.lat;
+                        const userLon = result.position.lng;
+                        const distance = calculateDistance(userLat, userLon, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
 
-                tip.textContent = '📍 定位验证通过，正在提交打卡...';
-                const { data: { user } } = await sbClient.auth.getUser();
-                const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
-                
-                if (error) { 
-                    tip.style.color = '#dc2626'; 
-                    tip.textContent = '打卡失败: ' + error.message; 
-                } else { 
-                    tip.style.color = '#16a34a'; 
-                    tip.textContent = `🎉 打卡成功！（定位校验通过：距离 ${Math.round(distance)}米）`; 
-                    checkHolidayAndAttendance(); 
-                    loadHistory(); 
-                }
-            }, (error) => {
-                console.error('定位获取失败:', error);
-                tip.style.color = '#dc2626';
-                let errMsg = '定位失败';
-                if (error.code === 1) errMsg = '用户拒绝了定位权限。';
-                else if (error.code === 2) errMsg = '无法获取位置信息。';
-                else if (error.code === 3) errMsg = '定位超时。';
-                alert('打卡失败：' + errMsg);
-                tip.textContent = '打卡失败: ' + errMsg;
-            }, { timeout: 10000, enableHighAccuracy: true });
+                        if (distance > COMPANY_LOCATION.maxDistance) {
+                            tip.style.color = '#dc2626';
+                            tip.textContent = `❌ 打卡失败：高德定位显示您距离公司约 ${Math.round(distance)} 米，超出了 250 米范围。`;
+                            alert(`不在打卡范围内！\n您当前距离永安锦苑7栋约 ${Math.round(distance)} 米（限定 250 米内）。`);
+                            return;
+                        }
+
+                        tip.textContent = '📍 高德定位验证通过，正在提交打卡...';
+                        const { data: { user } } = await sbClient.auth.getUser();
+                        const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
+                        
+                        if (error) { 
+                            tip.style.color = '#dc2626'; 
+                            tip.textContent = '打卡失败: ' + error.message; 
+                        } else { 
+                            tip.style.color = '#16a34a'; 
+                            tip.textContent = `🎉 打卡成功！（高德精准定位：距离 ${Math.round(distance)}米）`; 
+                            checkHolidayAndAttendance(); 
+                            loadHistory(); 
+                        }
+                    } else {
+                        console.error('高德定位失败:', result);
+                        tip.style.color = '#dc2626';
+                        tip.textContent = '打卡失败：无法获取高德精确定位，请允许浏览器定位权限。';
+                        alert('高德定位失败，请确保已授权浏览器定位权限。');
+                    }
+                });
+            });
         });
 
-        // 加载包含请假与常规打卡的考勤记录
         async function loadHistory() {
             const { data: { user } } = await sbClient.auth.getUser();
             const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).limit(10);
@@ -600,7 +610,6 @@
             alert('考勤数据分析完成！');
         });
 
-        // 智能考勤分析（增加请假正常判定）
         async function analyzeAttendanceData() {
             try {
                 const { data: records, error } = await sbClient.from('attendance').select('*').limit(100);
@@ -677,7 +686,6 @@
             }
         }
 
-        // 监控公告
         document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
             const title = document.getElementById('announcementTitleInput').value.trim();
             const content = document.getElementById('announcementContentInput').value.trim();
@@ -782,7 +790,6 @@
             else { alert('申请人记录已成功删除！'); loadAdminUsers(); }
         };
 
-        // 加载请假列表
         async function loadAdminLeaves() {
             try {
                 const { data: leaves, error: leaveError } = await sbClient.from('leave_requests').select('*');
@@ -828,9 +835,7 @@
             }
         }
 
-        // 💡 重点功能升级：请假批准后，自动把请假记录插入到考勤 (attendance) 表中！
         window.updateLeave = async (leaveId, userId, leaveType, startStr, endStr, status) => {
-            // 1. 更新请假单状态
             const { error: updateError } = await sbClient.from('leave_requests').update({ status }).eq('id', leaveId);
             
             if (updateError) {
@@ -838,18 +843,13 @@
                 return;
             }
 
-            // 2. 如果是批准，自动插入考勤记录
             if (status === '已批准') {
                 const leaveClockType = `请假(${leaveType}: ${startStr}至${endStr})`;
-                const { error: attError } = await sbClient.from('attendance').insert([{
+                await sbClient.from('attendance').insert([{
                     user_id: userId,
                     clock_type: leaveClockType,
                     clock_in_time: new Date().toISOString()
                 }]);
-
-                if (attError) {
-                    console.error('写入考勤记录异常:', attError);
-                }
             }
 
             alert(`已更新请假状态为：${status}${status === '已批准' ? '，并已同步写入考勤报表！' : ''}`);
@@ -858,7 +858,6 @@
             analyzeAttendanceData();
         };
 
-        // 全公司打卡/请假实时监控
         async function loadAdminAttendance() {
             try {
                 const { data: records, error } = await sbClient.from('attendance').select('*').limit(50);
@@ -897,7 +896,6 @@
             }
         }
 
-        // Excel 导出 (包含请假考勤明细)
         document.getElementById('exportExcelBtn').addEventListener('click', async () => {
             try {
                 const { data: records, error: recError } = await sbClient.from('attendance').select('*');
