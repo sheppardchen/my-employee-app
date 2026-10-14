@@ -736,16 +736,14 @@
                                 const hour = now.getHours();
                                 const minute = now.getMinutes();
 
-                                let finalType = currentClockState; // 'in' 或 'out'
+                                let finalType = currentClockState; 
                                 let statusTag = '正常';
 
                                 if (currentClockState === 'in') {
-                                    // 上班：9点以后 ( >= 9点0分 ) 打卡算异常（迟到）
                                     if (hour > 9 || (hour === 9 && minute > 0)) {
                                         statusTag = '异常(迟到)';
                                     }
                                 } else if (currentClockState === 'out') {
-                                    // 下班：早于18点 ( < 18点0分 ) 打卡算异常（早退）
                                     if (hour < 18) {
                                         statusTag = '异常(早退)';
                                     }
@@ -950,15 +948,27 @@
                     let normalCount = 0, abnormalCount = 0;
                     const rows = records.map(r => {
                         const fullName = profileMap[r.user_id] || '未知';
-                        const isAbnormal = r.clock_type && (r.clock_type.includes('异常') || r.clock_type.includes('迟到') || r.clock_type.includes('早退'));
+                        // 修正：增加对 [异常]、[迟到]、[早退]、[补卡] 的关键词精准识别
+                        const isAbnormal = r.clock_type && (
+                            r.clock_type.includes('异常') || 
+                            r.clock_type.includes('迟到') || 
+                            r.clock_type.includes('早退') || 
+                            r.clock_type.includes('补卡')
+                        );
                         const isLeave = r.clock_type && r.clock_type.startsWith('请假');
                         
                         const timeStr = r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : '未知';
                         let statusBadge = '<span class="badge-normal">正常打卡</span>';
 
-                        if (isLeave) { statusBadge = '<span class="badge-leave">准假记录</span>'; normalCount++; }
-                        else if (isAbnormal) { statusBadge = '<span class="badge-abnormal">异常/违规</span>'; abnormalCount++; }
-                        else { normalCount++; }
+                        if (isLeave) { 
+                            statusBadge = '<span class="badge-leave">准假记录</span>'; 
+                            normalCount++; 
+                        } else if (isAbnormal) { 
+                            statusBadge = '<span class="badge-abnormal">异常 / 违规</span>'; 
+                            abnormalCount++; 
+                        } else { 
+                            normalCount++; 
+                        }
 
                         return `<tr><td>${fullName}</td><td>${r.clock_type}</td><td>${timeStr}</td><td>${statusBadge}</td></tr>`;
                     });
@@ -1041,7 +1051,6 @@
                 if(tbody) tbody.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(r => `<tr><td>${profileMap[r.user_id] || '未知'}</td><td>${r.clock_type}</td><td>${r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : ''}</td></tr>`).join('');
             }
 
-            // 📊 导出包含详细工时及月末全员统计的 Excel 报表
             const exportExcelBtn = document.getElementById('exportExcelBtn');
             if (exportExcelBtn) {
                 exportExcelBtn.onclick = async function() {
@@ -1051,12 +1060,16 @@
 
                     if (!records) return;
 
-                    // 1. 构造明细表数据
                     const excelData = records.map(i => {
                         const timeObj = new Date(i.clock_in_time || i.clock_time);
                         const dateStr = timeObj.toLocaleDateString();
                         const timeStr = timeObj.toLocaleTimeString();
-                        const isAbnormal = i.clock_type && (i.clock_type.includes('异常') || i.clock_type.includes('迟到') || i.clock_type.includes('早退'));
+                        const isAbnormal = i.clock_type && (
+                            i.clock_type.includes('异常') || 
+                            i.clock_type.includes('迟到') || 
+                            i.clock_type.includes('早退') || 
+                            i.clock_type.includes('补卡')
+                        );
 
                         return {
                             '员工姓名': profileMap[i.user_id] || '未知员工',
@@ -1067,25 +1080,29 @@
                         };
                     });
 
-                    // 2. 统计月末每个人总上班天数、异常天数
                     const userStats = {};
                     records.forEach(i => {
                         const uid = i.user_id;
                         const name = profileMap[uid] || '未知员工';
                         if (!userStats[uid]) {
-                            userStats[uid] = { name: name, totalDaysSet: new Set(), abnormalCount: 0, details: [] };
+                            userStats[uid] = { name: name, totalDaysSet: new Set(), abnormalCount: 0 };
                         }
                         const timeObj = new Date(i.clock_in_time || i.clock_time);
                         const dayKey = timeObj.toISOString().slice(0, 10);
                         userStats[uid].totalDaysSet.add(dayKey);
 
-                        const isAbnormal = i.clock_type && (i.clock_type.includes('异常') || i.clock_type.includes('迟到') || i.clock_type.includes('早退'));
+                        const isAbnormal = i.clock_type && (
+                            i.clock_type.includes('异常') || 
+                            i.clock_type.includes('迟到') || 
+                            i.clock_type.includes('早退') || 
+                            i.clock_type.includes('补卡')
+                        );
                         if (isAbnormal) {
                             userStats[uid].abnormalCount++;
                         }
                     });
 
-                    excelData.push({}); // 空行分隔
+                    excelData.push({}); 
                     excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ===' });
 
                     Object.keys(userStats).forEach(uid => {
