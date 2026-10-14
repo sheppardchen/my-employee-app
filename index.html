@@ -228,7 +228,6 @@
     <div class="container">
         <!-- 登录区域 -->
         <div id="loginSection" class="card" style="max-width:420px; margin: 40px auto;">
-            <!-- 嵌入 Logo 图标 -->
             <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-large">
             <h2>🏢 企业员工登录</h2>
             <div class="input-group">
@@ -245,7 +244,6 @@
 
         <!-- 注册区域 -->
         <div id="registerSection" class="card" style="display: none; max-width:420px; margin: 40px auto;">
-            <!-- 嵌入 Logo 图标 -->
             <img src="/icon-512.png" alt="homekt Logo" class="brand-logo-large">
             <h2>📝 员工注册申请</h2>
             <div class="input-group"><label>真实姓名</label><input type="text" id="regName" placeholder="例如：张三"></div>
@@ -281,7 +279,7 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <div class="location-pill">📍 永安锦苑7栋考勤打卡</div>
+                <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
@@ -336,17 +334,17 @@
 
             <!-- 地图选点修改定位配置面板 -->
             <div class="card" style="border: 2px solid var(--primary-color);">
-                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (高德地图选点)</h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">支持微信同款地图选点模式，修改后全员打卡基准点将立即更新。</p>
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (云端全局同步)</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后将直接写入云端数据库，全员客户端打卡点即时同步更新。</p>
                 
                 <div class="flex-row">
                     <div class="input-group">
                         <label>当前基准纬度 (Latitude)</label>
-                        <input type="text" id="displayLat" value="27.952661" readonly>
+                        <input type="text" id="displayLat" value="27.950720" readonly>
                     </div>
                     <div class="input-group">
                         <label>当前基准经度 (Longitude)</label>
-                        <input type="text" id="displayLng" value="120.784334" readonly>
+                        <input type="text" id="displayLng" value="120.783677" readonly>
                     </div>
                 </div>
                 <button id="openMapPickerBtn" type="button" style="background: #2563eb;">📍 开启地图选点 (类似微信发送位置)</button>
@@ -477,7 +475,7 @@
             <div id="amapContainer"></div>
             <div id="selectedAddrTip" style="font-size: 13px; font-weight: 600; color: #2563eb; margin-bottom: 12px;">已选坐标：暂未选择</div>
             <div class="flex-row">
-                <button id="confirmMapBtn" type="button" style="background: #10b981;">✅ 确认使用此坐标</button>
+                <button id="confirmMapBtn" type="button" style="background: #10b981;">✅ 确认使用此坐标并同步云端</button>
                 <button id="closeMapBtn" type="button" style="background: #64748b;">❌ 取消</button>
             </div>
         </div>
@@ -497,9 +495,29 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            let savedLat = parseFloat(localStorage.getItem('company_lat')) || 27.952661;
-            let savedLng = parseFloat(localStorage.getItem('company_lng')) || 120.784334;
-            const COMPANY_LOCATION = { latitude: savedLat, longitude: savedLng, maxDistance: 650 };
+            // 📍 目标考勤坐标对象（初始默认 27.950720, 120.783677，后续自动从云端同步）
+            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 650 };
+
+            // 从云端数据库加载全局定位配置
+            async function fetchCloudLocation() {
+                try {
+                    const { data } = await sbClient.from('announcements').select('*').eq('title', '__SYS_LOCATION__').maybeSingle();
+                    if (data && data.content) {
+                        const parts = data.content.split(',');
+                        if (parts.length === 2) {
+                            COMPANY_LOCATION.latitude = parseFloat(parts[0]);
+                            COMPANY_LOCATION.longitude = parseFloat(parts[1]);
+                            const latInput = document.getElementById('displayLat');
+                            const lngInput = document.getElementById('displayLng');
+                            if(latInput) latInput.value = COMPANY_LOCATION.latitude.toFixed(6);
+                            if(lngInput) lngInput.value = COMPANY_LOCATION.longitude.toFixed(6);
+                        }
+                    }
+                } catch(e) {
+                    console.error('获取云端定位配置失败:', e);
+                }
+            }
+            fetchCloudLocation();
 
             const latInput = document.getElementById('displayLat');
             const lngInput = document.getElementById('displayLng');
@@ -621,7 +639,7 @@
             function loadEmployeeData() { loadAnnouncements(); checkHolidayAndAttendance(); loadHistory(); loadLeaveHistory(); }
 
             async function loadAnnouncements() {
-                const { data } = await sbClient.from('announcements').select('*').limit(3);
+                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').limit(3);
                 const listEl = document.getElementById('announcementList');
                 if (listEl) {
                     listEl.innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无最新公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`).join('');
@@ -711,6 +729,9 @@
 
                     if (!window.AMap) { alert('高德地图 SDK 未加载，请检查网络！'); return; }
 
+                    // 打卡前先拉取最新云端坐标
+                    await fetchCloudLocation();
+
                     AMap.plugin('AMap.Geolocation', function() {
                         const geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 10000, convert: true });
                         geolocation.getCurrentPosition(async function(status, result) {
@@ -763,7 +784,7 @@
                 }
             }
 
-            // 高德地图选点修改定位功能
+            // 高德地图选点修改定位功能 (同步云端数据库)
             let mapInstance = null;
             let markerInstance = null;
             let tempSelectedLat = COMPANY_LOCATION.latitude;
@@ -776,7 +797,11 @@
             const selectedAddrTip = document.getElementById('selectedAddrTip');
 
             if (openMapPickerBtn) {
-                openMapPickerBtn.onclick = function() {
+                openMapPickerBtn.onclick = async function() {
+                    await fetchCloudLocation();
+                    tempSelectedLat = COMPANY_LOCATION.latitude;
+                    tempSelectedLng = COMPANY_LOCATION.longitude;
+
                     mapModal.style.display = 'flex';
                     setTimeout(() => {
                         if (!mapInstance && window.AMap) {
@@ -808,17 +833,27 @@
             if (closeMapBtn) closeMapBtn.onclick = () => { mapModal.style.display = 'none'; };
 
             if (confirmMapBtn) {
-                confirmMapBtn.onclick = () => {
+                confirmMapBtn.onclick = async () => {
                     COMPANY_LOCATION.latitude = tempSelectedLat;
                     COMPANY_LOCATION.longitude = tempSelectedLng;
-                    localStorage.setItem('company_lat', tempSelectedLat);
-                    localStorage.setItem('company_lng', tempSelectedLng);
+
+                    // 写入云端 Supabase 数据库
+                    await sbClient.from('announcements').delete().eq('title', '__SYS_LOCATION__');
+                    const { error } = await sbClient.from('announcements').insert([{
+                        title: '__SYS_LOCATION__',
+                        content: `${tempSelectedLat},${tempSelectedLng}`
+                    }]);
+
+                    if (error) {
+                        alert('云端同步失败: ' + error.message);
+                        return;
+                    }
 
                     if(latInput) latInput.value = tempSelectedLat.toFixed(6);
                     if(lngInput) lngInput.value = tempSelectedLng.toFixed(6);
 
                     mapModal.style.display = 'none';
-                    alert(`📍 公司考勤打卡定位基准已成功更新！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}`);
+                    alert(`📍 公司考勤打卡定位基准已成功同步至云端！\n全员客户端打卡点已即时更新。\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}`);
                 };
             }
 
@@ -951,7 +986,7 @@
             }
 
             async function loadAdminAnnouncements() {
-                const { data } = await sbClient.from('announcements').select('*');
+                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__');
                 const tbody = document.getElementById('adminAnnouncementList');
                 if(tbody) tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无通知</td></tr>' : data.map(i => `<tr><td><strong>${i.title}</strong><br><small>${i.content}</small></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement('${i.id}')">删除</button></td></tr>`).join('');
             }
