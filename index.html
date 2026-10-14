@@ -276,7 +276,7 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <div class="location-pill">📍 公司考勤打卡点</div>
+                <div class="location-pill">📍 公司考勤打卡点 (250米内有效)</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
@@ -307,7 +307,7 @@
                     </select>
                 </div>
                 <div class="flex-row">
-                    <div class="input-group"><label>开始日期</label><input type="date" id="startDate"></div>
+                    <div class="input-group"><label>开始日期 (只能选择今天及以后)</label><input type="date" id="startDate"></div>
                     <div class="input-group"><label>结束日期</label><input type="date" id="endDate"></div>
                 </div>
                 <div class="input-group"><label>请假事由说明</label><textarea id="leaveReason" placeholder="请输入详细事由..." rows="2"></textarea></div>
@@ -331,8 +331,8 @@
 
             <!-- 地图选点修改定位配置面板 -->
             <div class="card" style="border: 2px solid var(--primary-color);">
-                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (云端全局同步)</h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后将直接写入云端数据库，全员客户端打卡点即时同步更新。</p>
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (250米电子围栏)</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡范围自动限制在 250 米内。</p>
                 
                 <div class="flex-row">
                     <div class="input-group">
@@ -379,7 +379,7 @@
             <div class="card" style="border: 2px solid #10b981;">
                 <h3>
                     <span>📈 智能考勤分析与统计</span>
-                    <button id="analyzeAttendanceBtn" type="button" class="btn-sm" style="background: #10b981;">📊 刷新分析</button>
+                    <button id="analyzeAttendanceBtn" type="button" class="btn-sm" style="background: #10b981;">📊 手动刷新分析</button>
                 </h3>
                 <div class="stats-grid">
                     <div class="stat-box">
@@ -409,7 +409,7 @@
             <div class="card" style="border: 2px solid #3b82f6;">
                 <h3>
                     <span>⚡ 全公司考勤打卡实时监控</span>
-                    <button id="refreshAttendanceBtn" type="button" class="btn-sm" style="background: #2563eb;">🔄 刷新打卡</button>
+                    <button id="refreshAttendanceBtn" type="button" class="btn-sm" style="background: #2563eb;">🔄 刷新数据列表</button>
                 </h3>
                 <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
                     <table>
@@ -423,13 +423,13 @@
 
             <!-- 4. 发布通知 -->
             <div class="card">
-                <h3>📢 发布公司通知</h3>
+                <h3>📢 发布公司通知 (自动记录发布时间)</h3>
                 <div class="input-group"><input type="text" id="announcementTitleInput" placeholder="通知标题"></div>
                 <div class="input-group"><textarea id="announcementContentInput" placeholder="详细内容..." rows="2"></textarea></div>
                 <button id="publishAnnouncementBtn" type="button" style="background: #f59e0b;">📤 立即发布</button>
                 <div style="margin-top:12px; max-height: 150px; overflow-y: auto;">
                     <table>
-                        <thead><tr><th>标题与内容</th><th>操作</th></tr></thead>
+                        <thead><tr><th>标题、内容与发布时间</th><th>操作</th></tr></thead>
                         <tbody id="adminAnnouncementList"><tr><td colspan="2">加载中...</td></tr></tbody>
                     </table>
                 </div>
@@ -492,7 +492,36 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 650 };
+            // 打卡围栏半径设置为 250 米
+            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 250 };
+
+            // 设置请假日期的最小值，防止选择过去的日期
+            function setupLeaveDateConstraints() {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${day}`;
+
+                const startDateInput = document.getElementById('startDate');
+                const endDateInput = document.getElementById('endDate');
+
+                if (startDateInput) {
+                    startDateInput.min = todayStr;
+                    startDateInput.addEventListener('change', function() {
+                        if (endDateInput) {
+                            endDateInput.min = this.value;
+                            if (endDateInput.value && endDateInput.value < this.value) {
+                                endDateInput.value = this.value;
+                            }
+                        }
+                    });
+                }
+                if (endDateInput) {
+                    endDateInput.min = todayStr;
+                }
+            }
+            setupLeaveDateConstraints();
 
             async function fetchCloudLocation() {
                 try {
@@ -560,6 +589,7 @@
                     if (profile.role === 'admin') {
                         showSection(adminSection);
                         loadAdminData();
+                        startAdminAutoRefresh();
                     } else {
                         showSection(dashboardSection);
                         const welcomeEl = document.getElementById('welcomeUser');
@@ -608,6 +638,7 @@
                     if (profile.role === 'admin') {
                         showSection(adminSection);
                         loadAdminData();
+                        startAdminAutoRefresh();
                     } else {
                         showSection(dashboardSection);
                         const welcomeEl = document.getElementById('welcomeUser');
@@ -625,10 +656,13 @@
             function loadEmployeeData() { loadAnnouncements(); checkHolidayAndAttendance(); loadHistory(); loadLeaveHistory(); }
 
             async function loadAnnouncements() {
-                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').limit(3);
+                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
                 const listEl = document.getElementById('announcementList');
                 if (listEl) {
-                    listEl.innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无最新公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`).join('');
+                    listEl.innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无最新公告</p>' : data.map(i => {
+                        const timeText = i.created_at ? new Date(i.created_at).toLocaleString() : '';
+                        return `<div class="announcement-item"><strong>${i.title}</strong> <span style="font-size:11px; color:#d97706; float:right;">发布于: ${timeText}</span><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`;
+                    }).join('');
                 }
             }
 
@@ -711,7 +745,7 @@
             if (clockBtn) {
                 clockBtn.onclick = async function() {
                     const tip = document.getElementById('clockResult');
-                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 高德定位获取中...'; }
+                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 高德定位获取中 (250米校验)...'; }
 
                     if (!window.AMap) { alert('高德地图 SDK 未加载，请检查网络！'); return; }
 
@@ -726,9 +760,9 @@
                                 if (distance > COMPANY_LOCATION.maxDistance) {
                                     if(tip) {
                                         tip.style.color = '#dc2626';
-                                        tip.textContent = '❌ 打卡失败：当前位置不在有效范围内';
+                                        tip.textContent = `❌ 打卡失败：当前距离打卡点 ${Math.round(distance)}米 (超出250米范围)`;
                                     }
-                                    alert('不在打卡范围内！请前往公司指定打卡区域。');
+                                    alert(`不在打卡范围内！当前距离 ${Math.round(distance)}米，超出 250 米限制。`);
                                     return;
                                 }
 
@@ -759,7 +793,7 @@
                                 } else {
                                     if(tip) { 
                                         tip.style.color = statusTag.includes('异常') ? '#dc2626' : '#10b981'; 
-                                        tip.textContent = `🎉 打卡成功！考勤结果：${statusTag}`; 
+                                        tip.textContent = `🎉 打卡成功！状态：${statusTag}`; 
                                     }
                                     checkHolidayAndAttendance(); 
                                     loadHistory();
@@ -772,7 +806,6 @@
                 };
             }
 
-            // 🛠️ 重点修复：客户端列表加载与精准时间规则判定逻辑
             async function loadHistory() {
                 const { data: { user } } = await sbClient.auth.getUser();
                 if(!user) return;
@@ -791,7 +824,6 @@
                         if (timeObj) {
                             const hour = timeObj.getHours();
                             const minute = timeObj.getMinutes();
-
                             const isIn = (rawType === 'in' || rawType.includes('上班'));
                             const isOut = (rawType === 'out' || rawType.includes('下班'));
 
@@ -821,7 +853,6 @@
                         if (rawType.includes('补卡')) icon = '🛠️';
 
                         const colorStyle = isAbnormal ? 'color:#dc2626; font-weight:bold;' : 'color:#0f172a;';
-
                         return `<li><span style="${colorStyle}">${icon} ${displayLabel}</span><span style="color:#64748b;">${timeStr}</span></li>`;
                     }).join('');
                 }
@@ -893,7 +924,7 @@
                     if(lngInput) lngInput.value = tempSelectedLng.toFixed(6);
 
                     mapModal.style.display = 'none';
-                    alert(`📍 公司打卡定位已同步云端！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}`);
+                    alert(`📍 打卡定位已同步云端！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}\n围栏范围: 250米`);
                 };
             }
 
@@ -909,6 +940,20 @@
                     const tip = document.getElementById('leaveResult');
 
                     if (!start || !end) { alert('请选择完整起止日期！'); return; }
+
+                    const todayDate = new Date();
+                    todayDate.setHours(0,0,0,0);
+                    const selectedStartDate = new Date(start + 'T00:00:00');
+
+                    if (selectedStartDate < todayDate) {
+                        alert('❌ 请假开始日期不能早于今天！');
+                        return;
+                    }
+
+                    if (new Date(end + 'T00:00:00') < selectedStartDate) {
+                        alert('❌ 请假结束日期不能早于开始日期！');
+                        return;
+                    }
 
                     const { error } = await sbClient.from('leave_requests').insert([{ 
                         user_id: user.id, request_type: type, 
@@ -934,6 +979,16 @@
             }
 
             function loadAdminData() { loadAdminUsers(); loadAdminLeaves(); loadAdminAttendance(); loadAdminAnnouncements(); analyzeAttendanceData(); populateManualUserSelect(); }
+
+            // 🎯 后台自动静默轮询更新间隔已调整为每两小时一次 (2小时 = 7200000毫秒)
+            function startAdminAutoRefresh() {
+                setInterval(() => {
+                    loadAdminUsers();
+                    loadAdminLeaves();
+                    loadAdminAttendance();
+                    analyzeAttendanceData();
+                }, 2 * 60 * 60 * 1000);
+            }
 
             async function populateManualUserSelect() {
                 const { data: profiles } = await sbClient.from('profiles').select('*');
@@ -971,9 +1026,9 @@
             }
 
             const refreshAttendanceBtn = document.getElementById('refreshAttendanceBtn');
-            if(refreshAttendanceBtn) refreshAttendanceBtn.onclick = () => { loadAdminAttendance(); analyzeAttendanceData(); alert('数据已刷新！'); };
+            if(refreshAttendanceBtn) refreshAttendanceBtn.onclick = () => { loadAdminAttendance(); analyzeAttendanceData(); alert('数据已手动刷新！'); };
             const analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
-            if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = () => { analyzeAttendanceData(); alert('分析已刷新！'); };
+            if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = () => { analyzeAttendanceData(); alert('分析已手动刷新！'); };
 
             async function analyzeAttendanceData() {
                 try {
@@ -1000,7 +1055,6 @@
                         if (timeObj) {
                             const hour = timeObj.getHours();
                             const minute = timeObj.getMinutes();
-
                             const isIn = (typeStr === 'in' || typeStr.includes('上班'));
                             const isOut = (typeStr === 'out' || typeStr.includes('下班'));
 
@@ -1044,18 +1098,32 @@
                 publishAnnouncementBtn.onclick = async function() {
                     const title = document.getElementById('announcementTitleInput').value.trim();
                     const content = document.getElementById('announcementContentInput').value.trim();
-                    if (!title || !content) return;
-                    await sbClient.from('announcements').insert([{ title, content }]);
-                    document.getElementById('announcementTitleInput').value = ''; 
-                    document.getElementById('announcementContentInput').value = '';
-                    loadAdminAnnouncements();
+                    if (!title || !content) { alert('标题和内容不能为空！'); return; }
+                    
+                    const { error } = await sbClient.from('announcements').insert([{ 
+                        title, 
+                        content, 
+                        created_at: new Date().toISOString() 
+                    }]);
+
+                    if (error) {
+                        alert('发布失败: ' + error.message);
+                    } else {
+                        document.getElementById('announcementTitleInput').value = ''; 
+                        document.getElementById('announcementContentInput').value = '';
+                        loadAdminAnnouncements();
+                        alert('📢 通知发布成功！');
+                    }
                 };
             }
 
             async function loadAdminAnnouncements() {
-                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__');
+                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false });
                 const tbody = document.getElementById('adminAnnouncementList');
-                if(tbody) tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无通知</td></tr>' : data.map(i => `<tr><td><strong>${i.title}</strong><br><small>${i.content}</small></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement('${i.id}')">删除</button></td></tr>`).join('');
+                if(tbody) tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无通知</td></tr>' : data.map(i => {
+                    const timeText = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
+                    return `<tr><td><strong>${i.title}</strong><br><small style="color:#475569;">${i.content}</small><br><span style="font-size:11px; color:#d97706;">发布时间: ${timeText}</span></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement('${i.id}')">删除</button></td></tr>`;
+                }).join('');
             }
 
             window.deleteAnnouncement = async (id) => { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
@@ -1167,26 +1235,4 @@
                     });
 
                     excelData.push({}); 
-                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ===' });
-
-                    Object.keys(userStats).forEach(uid => {
-                        const stat = userStats[uid];
-                        excelData.push({
-                            '员工姓名': stat.name,
-                            '打卡日期': `总计出勤天数: ${stat.totalDaysSet.size} 天`,
-                            '打卡详细时间': `异常打卡次数: ${stat.abnormalCount} 次`,
-                            '当日上班时间段/具体说明': stat.abnormalCount === 0 ? '全勤表现良好' : '存在迟到/早退/异常记录，请核查',
-                            '状态判定': stat.abnormalCount === 0 ? '正常' : '需关注'
-                        });
-                    });
-
-                    const ws = XLSX.utils.json_to_sheet(excelData);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "全员考勤明细与统计");
-                    XLSX.writeFile(wb, `企业全员考勤及月度统计报表_${new Date().toISOString().slice(0,10)}.xlsx`);
-                };
-            }
-        });
-    </script>
-</body>
-</html>
+                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ==='
