@@ -484,4 +484,370 @@
                 return;
             }
             const { error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
-            if (error
+            if (error) {
+                alert('注册失败: ' + error.message);
+            } else { 
+                alert('🎉 注册提交成功！等待管理员审核。'); 
+                registerSection.style.display = 'none'; 
+                pendingSection.style.display = 'block'; 
+            }
+        });
+
+        // 登录按钮绑定
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            if (!email || !password) { alert('请输入邮箱和密码'); return; }
+
+            const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) { alert('登录失败: ' + error.message); return; }
+
+            const { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single();
+            if (!profile || (!profile.is_approved && profile.status !== '已批准')) {
+                await sbClient.auth.signOut();
+                loginSection.style.display = 'none'; 
+                pendingSection.style.display = 'block'; 
+                return;
+            }
+
+            loginSection.style.display = 'none';
+            if (profile.role === 'admin') { 
+                adminSection.style.display = 'block'; 
+                loadAdminData(); 
+            } else { 
+                dashboardSection.style.display = 'block'; 
+                document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name}`; 
+                loadEmployeeData(); 
+            }
+        });
+
+        const logoutHandler = async () => { await sbClient.auth.signOut(); location.reload(); };
+        document.getElementById('logoutBtn').addEventListener('click', logoutHandler);
+        document.getElementById('adminLogoutBtn').addEventListener('click', logoutHandler);
+
+        function loadEmployeeData() { loadAnnouncements(); checkHolidayAndAttendance(); loadHistory(); loadLeaveHistory(); }
+
+        async function loadAnnouncements() {
+            const { data } = await sbClient.from('announcements').select('*').limit(3);
+            const listEl = document.getElementById('announcementList');
+            if (listEl) {
+                listEl.innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无最新公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`).join('');
+            }
+        }
+
+        async function checkHolidayAndAttendance() {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            let isHoliday = (now.getDay() === 0 || now.getDay() === 6);
+            try {
+                const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${now.getFullYear()}/CN`);
+                if (res.ok) {
+                    const holidays = await res.json();
+                    if (holidays.find(h => h.date === todayStr)) isHoliday = true;
+                }
+            } catch(e){}
+
+            const banner = document.getElementById('holidayBanner');
+            const btn = document.getElementById('clockBtn');
+            const mainText = document.getElementById('clockBtnMainText');
+            const subText = document.getElementById('clockBtnSubText');
+
+            if (isHoliday) {
+                if(banner) banner.style.display = 'block';
+                if(btn) {
+                    btn.className = 'clock-circle-btn btn-done';
+                    mainText.textContent = '今日放假'; subText.textContent = '无需打卡';
+                    btn.disabled = true; 
+                }
+                return;
+            }
+            if(banner) banner.style.display = 'none';
+
+            const { data: { user } } = await sbClient.auth.getUser();
+            if (!user) return;
+            
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', todayStart.toISOString());
+            
+            const hasIn = records?.some(r => r.clock_type === 'in' || r.clock_type.includes('补卡(上班)'));
+            const hasOut = records?.some(r => r.clock_type === 'out' || r.clock_type.includes('补卡(下班)'));
+            const tip = document.getElementById('clockResult');
+
+            if (!hasIn) {
+                currentClockState = 'in';
+                if(btn) {
+                    btn.className = 'clock-circle-btn btn-in';
+                    mainText.textContent = '上班打卡'; subText.textContent = '09:00 前';
+                    btn.disabled = false;
+                }
+            } else if (!hasOut) {
+                currentClockState = 'out';
+                if(btn) {
+                    btn.className = 'clock-circle-btn btn-out';
+                    mainText.textContent = '下班打卡'; subText.textContent = '18:00 后';
+                    btn.disabled = false;
+                }
+                if(tip) { tip.style.color = '#10b981'; tip.textContent = '✅ 已完成上班打卡'; }
+            } else {
+                if(btn) {
+                    btn.className = 'clock-circle-btn btn-done';
+                    mainText.textContent = '已打卡'; subText.textContent = '考勤已完成';
+                    btn.disabled = true;
+                }
+                if(tip) { tip.style.color = '#10b981'; tip.textContent = '🎉 今日考勤已全部完成！'; }
+            }
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        // 高德高精度打卡
+        document.getElementById('clockBtn').addEventListener('click', async () => {
+            const tip = document.getElementById('clockResult');
+            if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 高德定位获取中...'; }
+
+            if (!window.AMap) { alert('高德地图 SDK 未加载！'); return; }
+
+            AMap.plugin('AMap.Geolocation', function() {
+                const geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 10000, convert: true });
+                geolocation.getCurrentPosition(async function(status, result) {
+                    if (status === 'complete') {
+                        const distance = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
+
+                        if (distance > COMPANY_LOCATION.maxDistance) {
+                            if(tip) {
+                                tip.style.color = '#dc2626';
+                                tip.textContent = `❌ 打卡超出范围：距离打卡点约 ${Math.round(distance)} 米`;
+                            }
+                            alert(`不在打卡范围内！\n您当前距离永安锦苑7栋约 ${Math.round(distance)} 米（限250米内）。`);
+                            return;
+                        }
+
+                        const { data: { user } } = await sbClient.auth.getUser();
+                        const { error } = await sbClient.from('attendance').insert([{ user_id: user.id, clock_type: currentClockState }]);
+                        
+                        if (error) { 
+                            if(tip) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
+                        } else {
+                            if(tip) { tip.style.color = '#10b981'; tip.textContent = `🎉 打卡成功！（精准定位距离: ${Math.round(distance)}米）`; }
+                            checkHolidayAndAttendance(); 
+                            loadHistory();
+                        }
+                    } else {
+                        if(tip) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败：请开启手机 GPS 及定位权限'; }
+                    }
+                });
+            });
+        });
+
+        async function loadHistory() {
+            const { data: { user } } = await sbClient.auth.getUser();
+            if(!user) return;
+            const { data } = await sbClient.from('attendance').select('*').eq('user_id', user.id).limit(10);
+            
+            const historyListEl = document.getElementById('historyList');
+            if(historyListEl) {
+                historyListEl.innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => {
+                    let label = '🟢 上班打卡';
+                    if (i.clock_type === 'out') label = '🔴 下班打卡';
+                    else if (i.clock_type && i.clock_type.startsWith('请假')) label = `🌴 ${i.clock_type}`;
+                    else if (i.clock_type && i.clock_type.includes('补卡')) label = `🛠️ ${i.clock_type}`;
+                    
+                    const timeStr = new Date(i.clock_in_time || i.clock_time).toLocaleString();
+                    return `<li><span>${label}</span><span style="color:#64748b;">${timeStr}</span></li>`;
+                }).join('');
+            }
+        }
+
+        // 请假提交
+        document.getElementById('submitLeaveBtn').addEventListener('click', async () => {
+            const { data: { user } } = await sbClient.auth.getUser();
+            if(!user) return;
+            const type = document.getElementById('leaveType').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const reason = document.getElementById('leaveReason').value.trim();
+            const tip = document.getElementById('leaveResult');
+
+            if (!start || !end) { alert('请选择完整起止日期！'); return; }
+
+            const { error } = await sbClient.from('leave_requests').insert([{ 
+                user_id: user.id, request_type: type, 
+                start_date: new Date(start + 'T00:00:00').toISOString(), 
+                end_date: new Date(end + 'T23:59:59').toISOString(), 
+                end_at: new Date(end + 'T23:59:59').toISOString(),
+                reason: reason || '无', status: '待审批' 
+            }]);
+
+            if (error) alert('提交失败: ' + error.message);
+            else { if(tip) { tip.style.color = '#10b981'; tip.textContent = '✅ 请假申请已提交！'; } loadLeaveHistory(); }
+        });
+
+        async function loadLeaveHistory() {
+            const { data: { user } } = await sbClient.auth.getUser();
+            if(!user) return;
+            const { data } = await sbClient.from('leave_requests').select('*').eq('user_id', user.id).limit(5);
+            const leaveHistoryListEl = document.getElementById('leaveHistoryList');
+            if(leaveHistoryListEl) {
+                leaveHistoryListEl.innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(i => `<li><span>📌 [${i.request_type}] ${i.start_date?i.start_date.slice(0,10):''}至${i.end_date?i.end_date.slice(0,10):''}</span><span class="badge-${i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending'}">${i.status}</span></li>`).join('');
+            }
+        }
+
+        function loadAdminData() { loadAdminUsers(); loadAdminLeaves(); loadAdminAttendance(); loadAdminAnnouncements(); analyzeAttendanceData(); populateManualUserSelect(); }
+
+        async function populateManualUserSelect() {
+            const { data: profiles } = await sbClient.from('profiles').select('*');
+            const select = document.getElementById('manualUserSelect');
+            if (select && profiles) select.innerHTML = profiles.map(p => `<option value="${p.id || p.user_id}">${p.full_name || '未命名员工'}</option>`).join('');
+        }
+
+        // 管理员补卡逻辑
+        document.getElementById('submitManualClockBtn').addEventListener('click', async () => {
+            const userId = document.getElementById('manualUserSelect').value;
+            const clockType = document.getElementById('manualClockType').value;
+            const clockTimeInput = document.getElementById('manualClockTime').value;
+            const reason = document.getElementById('manualReason').value.trim();
+
+            if (!userId || !clockTimeInput || !reason) { alert('请填写包含“补卡原因说明”在内的所有必填项！'); return; }
+
+            const clockIso = new Date(clockTimeInput).toISOString();
+            const fullClockTypeLabel = `${clockType} - 原因: ${reason}`;
+
+            const { error } = await sbClient.from('attendance').insert([{
+                user_id: userId,
+                clock_type: fullClockTypeLabel,
+                clock_in_time: clockIso
+            }]);
+
+            if (error) alert('补卡失败: ' + error.message);
+            else {
+                alert('🎉 已生成标注为【补卡】的考勤记录！');
+                document.getElementById('manualReason').value = '';
+                loadAdminAttendance(); 
+                analyzeAttendanceData();
+            }
+        });
+
+        document.getElementById('refreshAttendanceBtn').addEventListener('click', () => { loadAdminAttendance(); analyzeAttendanceData(); alert('数据已更新！'); });
+        document.getElementById('analyzeAttendanceBtn').addEventListener('click', () => { analyzeAttendanceData(); alert('分析已更新！'); });
+
+        async function analyzeAttendanceData() {
+            try {
+                const { data: records } = await sbClient.from('attendance').select('*').limit(100);
+                const { data: profiles } = await sbClient.from('profiles').select('*');
+                const profileMap = {};
+                if (profiles) profiles.forEach(p => { profileMap[p.id || p.user_id] = p.full_name || '未命名'; });
+
+                if (!records) return;
+
+                let normalCount = 0, abnormalCount = 0;
+                const rows = records.map(r => {
+                    const fullName = profileMap[r.user_id] || '未知';
+                    const isLeave = r.clock_type && r.clock_type.startsWith('请假');
+                    const isManual = r.clock_type && r.clock_type.includes('补卡');
+                    
+                    const timeStr = r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : '未知';
+                    let statusBadge = '<span class="badge-normal">正常打卡</span>';
+
+                    if (isLeave) { statusBadge = '<span class="badge-leave">准假记录</span>'; normalCount++; }
+                    else if (isManual) { statusBadge = '<span class="badge-manual">管理员补卡</span>'; abnormalCount++; }
+                    else { normalCount++; }
+
+                    return `<tr><td>${fullName}</td><td>${r.clock_type}</td><td>${timeStr}</td><td>${statusBadge}</td></tr>`;
+                });
+
+                document.getElementById('statTotal').textContent = records.length;
+                document.getElementById('statNormal').textContent = normalCount;
+                document.getElementById('statLate').textContent = abnormalCount;
+                document.getElementById('adminAttendanceAnalysisList').innerHTML = rows.join('');
+            } catch (e) {}
+        }
+
+        document.getElementById('publishAnnouncementBtn').addEventListener('click', async () => {
+            const title = document.getElementById('announcementTitleInput').value.trim();
+            const content = document.getElementById('announcementContentInput').value.trim();
+            if (!title || !content) return;
+            await sbClient.from('announcements').insert([{ title, content }]);
+            document.getElementById('announcementTitleInput').value = ''; 
+            document.getElementById('announcementContentInput').value = '';
+            loadAdminAnnouncements();
+        });
+
+        async function loadAdminAnnouncements() {
+            const { data } = await sbClient.from('announcements').select('*');
+            const tbody = document.getElementById('adminAnnouncementList');
+            if(tbody) tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无通知</td></tr>' : data.map(i => `<tr><td><strong>${i.title}</strong><br><small>${i.content}</small></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement('${i.id}')">删除</button></td></tr>`).join('');
+        }
+
+        window.deleteAnnouncement = async (id) => { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
+
+        async function loadAdminUsers() {
+            const { data } = await sbClient.from('profiles').select('*');
+            const tbody = document.getElementById('adminUserList');
+            if(tbody) tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">无注册用户</td></tr>' : data.map(u => {
+                const uid = u.id || u.user_id;
+                let isApproved = u.is_approved || u.status === '已批准';
+                let isRejected = u.status === '已拒绝';
+                return `<tr><td>${u.full_name || '未命名'}</td><td>${u.created_at ? u.created_at.slice(0,10) : ''}</td><td>${isApproved?'已批准':isRejected?'已拒绝':'待审核'}</td><td class="action-btns"><button class="btn-success" ${isApproved||isRejected?'disabled':''} onclick="reviewUser('${uid}', true)">批准</button><button class="btn-danger" ${isApproved||isRejected?'disabled':''} onclick="reviewUser('${uid}', false)">拒绝</button></td></tr>`;
+            }).join('');
+        }
+
+        window.reviewUser = async (id, isApproved) => {
+            await sbClient.from('profiles').update({ is_approved: isApproved, status: isApproved ? '已批准' : '已拒绝' }).eq('id', id);
+            loadAdminUsers();
+        };
+
+        async function loadAdminLeaves() {
+            const { data: leaves } = await sbClient.from('leave_requests').select('*');
+            const { data: profiles } = await sbClient.from('profiles').select('*');
+            const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
+
+            const tbody = document.getElementById('adminLeaveList');
+            if(tbody) tbody.innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假申请</td></tr>' : leaves.map(l => {
+                const fullName = profileMap[l.user_id] || '未知';
+                const isProcessed = l.status !== '待审批';
+                return `<tr><td>${fullName} (${l.request_type})</td><td>${l.start_date?l.start_date.slice(0,10):''}~${l.end_date?l.end_date.slice(0,10):''}</td><td>${l.reason}</td><td>${l.status}</td><td class="action-btns"><button class="btn-success" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', '${l.user_id}', '${l.request_type}', '${l.start_date}', '${l.end_date}', '已批准')">批准</button><button class="btn-danger" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', false, false, false, false, '已拒绝')">拒绝</button></td></tr>`;
+            }).join('');
+        }
+
+        window.updateLeave = async (leaveId, userId, leaveType, startStr, endStr, status) => {
+            await sbClient.from('leave_requests').update({ status }).eq('id', leaveId);
+            if (status === '已批准') {
+                await sbClient.from('attendance').insert([{ user_id: userId, clock_type: `请假(${leaveType})`, clock_in_time: new Date().toISOString() }]);
+            }
+            loadAdminLeaves(); loadAdminAttendance(); analyzeAttendanceData();
+        };
+
+        async function loadAdminAttendance() {
+            const { data: records } = await sbClient.from('attendance').select('*').limit(50);
+            const { data: profiles } = await sbClient.from('profiles').select('*');
+            const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
+
+            const tbody = document.getElementById('adminAttendanceList');
+            if(tbody) tbody.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(r => `<tr><td>${profileMap[r.user_id] || '未知'}</td><td>${r.clock_type}</td><td>${r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : ''}</td></tr>`).join('');
+        }
+
+        document.getElementById('exportExcelBtn').addEventListener('click', async () => {
+            const { data: records } = await sbClient.from('attendance').select('*');
+            const { data: profiles } = await sbClient.from('profiles').select('*');
+            const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
+
+            if (!records) return;
+            const excelData = records.map(i => ({
+                '员工姓名': profileMap[i.user_id] || '未知员工',
+                '考勤/打卡/补卡说明': i.clock_type,
+                '记录创建时间': new Date(i.clock_in_time || i.clock_time).toLocaleString()
+            }));
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "全员考勤表");
+            XLSX.writeFile(wb, `企业考勤明细表_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
+    </script>
+</body>
+</html>
