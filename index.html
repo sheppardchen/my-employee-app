@@ -42,8 +42,7 @@
             padding: 22px;
             border-radius: 16px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.01);
-            transition: all 0.2s ease;
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
         }
 
         h2, h3 { margin-top: 0; color: var(--text-main); text-align: center; font-weight: 700; }
@@ -69,7 +68,6 @@
             font-size: 14px;
             background-color: #f8fafc;
             color: var(--text-main);
-            transition: border-color 0.2s;
         }
         input:focus, select:focus, textarea:focus {
             outline: none;
@@ -130,13 +128,11 @@
             font-weight: 700;
             cursor: pointer;
             border: 6px solid rgba(255, 255, 255, 0.8);
-            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
         }
         .clock-circle-btn.btn-in { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-        .clock-circle-btn.btn-out { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); box-shadow: 0 12px 24px rgba(13, 148, 136, 0.3); }
+        .clock-circle-btn.btn-out { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); }
         .clock-circle-btn.btn-done { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: none; cursor: not-allowed; }
-        .clock-circle-btn:hover:not(:disabled) { transform: scale(1.04); }
         .clock-circle-btn .sub-text { font-size: 12px; font-weight: 400; opacity: 0.9; margin-top: 4px; }
 
         .location-pill {
@@ -164,7 +160,7 @@
         .badge-manual { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 0; list-style: none; max-height: 180px; overflow-y: auto; margin: 0; }
-        li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; color: var(--text-main); display: flex; justify-content: space-between; }
+        li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; }
         
         .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px; }
         .holiday-banner { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 16px; display: none; }
@@ -197,7 +193,7 @@
                 <input type="password" id="loginPassword" placeholder="请输入密码">
             </div>
             <button id="loginBtn">登录系统</button>
-            <button class="switch-btn" id="toRegisterBtn">新员工注册账号</button>
+            <button class="switch-btn" id="toRegisterBtn" type="button">新员工注册账号</button>
         </div>
 
         <!-- 注册区域 -->
@@ -208,14 +204,14 @@
             <div class="input-group"><label>设置密码</label><input type="password" id="regPassword" placeholder="至少6位密码"></div>
             <div class="input-group"><label>确认密码</label><input type="password" id="regConfirmPassword" placeholder="再次输入密码"></div>
             <button id="registerBtn" style="background: #10b981;">提交注册申请</button>
-            <button class="switch-btn" id="toLoginBtn">返回登录</button>
+            <button class="switch-btn" id="toLoginBtn" type="button">返回登录</button>
         </div>
 
         <!-- 待审核提示区域 -->
         <div id="pendingSection" class="card" style="display: none; text-align: center; max-width:420px; margin: 40px auto;">
             <h2 style="color: #d97706;">⏳ 账号正在审核中</h2>
             <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">您的注册申请已提交给管理人员，请等待批准后登录系统。</p>
-            <button class="switch-btn" id="backToLoginBtn">返回登录页面</button>
+            <button class="switch-btn" id="backToLoginBtn" type="button">返回登录页面</button>
         </div>
 
         <!-- 员工主功能看板 -->
@@ -235,7 +231,7 @@
             <div class="card clock-card">
                 <div class="location-pill">📍 温州市龙湾区瑶溪街道永安锦苑7栋 (250米内)</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
-                <div class="date-display" id="liveDate">2026年10月14日 星期三</div>
+                <div class="date-display" id="liveDate">加载中...</div>
 
                 <div id="holidayBanner" class="holiday-banner">🏖️ 今天是法定节假日/周末，无需打卡！</div>
                 
@@ -247,7 +243,7 @@
                 <p id="clockResult" style="font-size:13px; font-weight:600; margin-top:8px; min-height: 20px;"></p>
                 
                 <div style="text-align: left; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-                    <h4 style="font-size:14px; margin:0 0 10px 0; color:var(--text-main);">🗓️ 今日考勤与打卡记录：</h4>
+                    <h4 style="font-size:14px; margin:0 0 10px 0;">🗓️ 今日考勤与打卡记录：</h4>
                     <ul id="historyList"><li>加载中...</li></ul>
                 </div>
             </div>
@@ -283,10 +279,9 @@
                 <button class="logout-btn" id="adminLogoutBtn">退出</button>
             </div>
 
-            <!-- 1. 管理员补卡功能（明确标示为补卡并带原因说明） -->
+            <!-- 1. 管理员补卡功能 -->
             <div class="card" style="border: 2px solid #f59e0b;">
                 <h3 style="color:#d97706;">🛠️ 管理员手动补卡 / 异常纠偏</h3>
-                <p style="font-size: 12px; color: var(--text-secondary); margin-top: -8px;">生成的打卡记录将标注为“🛠️ 补卡记录”，并在报表中附带补卡原因。</p>
                 <div class="flex-row">
                     <div class="input-group">
                         <label>选择员工</label>
@@ -306,7 +301,7 @@
                     <input type="datetime-local" id="manualClockTime">
                 </div>
                 <div class="input-group">
-                    <label>补卡情况说明/原因（必填）</label>
+                    <label>补卡原因说明（必填）</label>
                     <input type="text" id="manualReason" placeholder="例如：员工因外勤无法定位，管理员手动补卡">
                 </div>
                 <button id="submitManualClockBtn" style="background: #f59e0b;">💾 提交补充打卡记录</button>
@@ -328,7 +323,7 @@
                         <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
                     </div>
                     <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">迟到/早退/补卡</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">补卡/异常</div>
                         <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
                     </div>
                 </div>
@@ -403,7 +398,7 @@
 
     <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- 引入高德地图 JS API ( Key: da390c1044f829bace14781906526616) -->
+    <!-- 引入高德地图 JS API (Key: da390c1044f829bace14781906526616) -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
     
     <script>
@@ -426,17 +421,30 @@
         let currentClockState = 'in';
 
         // 实时数字时钟显示
-        function startLiveClock() {
-            setInterval(() => {
-                const now = new Date();
-                document.getElementById('liveClock').textContent = now.toTimeString().split(' ')[0];
-                const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
-                document.getElementById('liveDate').textContent = now.toLocaleDateString('zh-CN', options);
-            }, 1000);
-        }
-        startLiveClock();
+        setInterval(() => {
+            const now = new Date();
+            const clockEl = document.getElementById('liveClock');
+            const dateEl = document.getElementById('liveDate');
+            if (clockEl) clockEl.textContent = now.toTimeString().split(' ')[0];
+            if (dateEl) dateEl.textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+        }, 1000);
 
+        // 页面初始化及状态恢复
         window.addEventListener('DOMContentLoaded', async () => {
+            // 绑定切换按钮（确保事件稳妥绑定）
+            document.getElementById('toRegisterBtn').addEventListener('click', () => {
+                loginSection.style.display = 'none';
+                registerSection.style.display = 'block';
+            });
+            document.getElementById('toLoginBtn').addEventListener('click', () => {
+                registerSection.style.display = 'none';
+                loginSection.style.display = 'block';
+            });
+            document.getElementById('backToLoginBtn').addEventListener('click', () => {
+                pendingSection.style.display = 'none';
+                loginSection.style.display = 'block';
+            });
+
             try {
                 const { data: { session } } = await sbClient.auth.getSession();
                 if (!session || !session.user) return;
@@ -445,46 +453,35 @@
                 if (!profile) return;
 
                 if (!profile.is_approved && profile.status !== '已批准') {
-                    loginSection.style.display = 'none'; pendingSection.style.display = 'block'; return;
+                    loginSection.style.display = 'none'; 
+                    pendingSection.style.display = 'block'; 
+                    return;
                 }
 
                 loginSection.style.display = 'none';
                 if (profile.role === 'admin') {
-                    adminSection.style.display = 'block'; loadAdminData();
+                    adminSection.style.display = 'block'; 
+                    loadAdminData();
                 } else {
                     dashboardSection.style.display = 'block';
                     document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name}`;
                     loadEmployeeData();
                 }
-            } catch (err) { console.error('恢复登录异常:', err); }
+            } catch (err) { 
+                console.error('恢复登录异常:', err); 
+            }
         });
 
-        document.getElementById('toRegisterBtn').onclick = () => { loginSection.style.display = 'none'; registerSection.style.display = 'block'; };
-        document.getElementById('toLoginBtn').onclick = () => { registerSection.style.display = 'none'; loginSection.style.display = 'block'; };
-        document.getElementById('backToLoginBtn').onclick = () => { pendingSection.style.display = 'none'; loginSection.style.display = 'block'; };
-
-        // 注册 & 登录
-        document.getElementById('registerBtn').onclick = async () => {
+        // 注册按钮绑定
+        document.getElementById('registerBtn').addEventListener('click', async () => {
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
             const password = document.getElementById('regPassword').value.trim();
             const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
 
             if (!name || !email || !password || password !== confirmPassword || password.length < 6) {
-                alert('请填写完整信息，并确认密码一致且不小于6位！'); return;
+                alert('请完整填写，并确保两次密码一致（且长度不少于6位）！'); 
+                return;
             }
             const { error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
-            if (error) alert('注册失败: ' + error.message);
-            else { alert('🎉 注册提交成功！等待管理员审核。'); registerSection.style.display = 'none'; pendingSection.style.display = 'block'; }
-        };
-
-        document.getElementById('loginBtn').onclick = async () => {
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-            if (!email || !password) { alert('请输入邮箱和密码'); return; }
-
-            const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-            if (error) { alert('登录失败: ' + error.message); return; }
-
-            const { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single();
-            if (!profile || (!profile.is_approved && profile.status !== '已
+            if (error
