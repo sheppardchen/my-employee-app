@@ -757,7 +757,10 @@
                                 if (error) { 
                                     if(tip) { tip.style.color = '#dc2626'; tip.textContent = '打卡失败: ' + error.message; }
                                 } else {
-                                    if(tip) { tip.style.color = '#10b981'; tip.textContent = `🎉 打卡成功！状态：${statusTag}`; }
+                                    if(tip) { 
+                                        tip.style.color = statusTag.includes('异常') ? '#dc2626' : '#10b981'; 
+                                        tip.textContent = `🎉 打卡成功！考勤结果：${statusTag}`; 
+                                    }
                                     checkHolidayAndAttendance(); 
                                     loadHistory();
                                 }
@@ -769,6 +772,7 @@
                 };
             }
 
+            // 🛠️ 重点修复：客户端列表加载与精准时间规则判定逻辑
             async function loadHistory() {
                 const { data: { user } } = await sbClient.auth.getUser();
                 if(!user) return;
@@ -777,13 +781,48 @@
                 const historyListEl = document.getElementById('historyList');
                 if(historyListEl) {
                     historyListEl.innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(i => {
-                        let label = `🟢 ${i.clock_type}`;
-                        if (i.clock_type && i.clock_type.includes('下班')) label = `🔴 ${i.clock_type}`;
-                        else if (i.clock_type && i.clock_type.startsWith('请假')) label = `🌴 ${i.clock_type}`;
-                        else if (i.clock_type && i.clock_type.includes('补卡')) label = `🛠️ ${i.clock_type}`;
-                        
-                        const timeStr = new Date(i.clock_in_time || i.clock_time).toLocaleString();
-                        return `<li><span>${label}</span><span style="color:#64748b;">${timeStr}</span></li>`;
+                        const rawType = i.clock_type || '';
+                        const timeObj = i.clock_in_time ? new Date(i.clock_in_time) : (i.clock_time ? new Date(i.clock_time) : null);
+                        const timeStr = timeObj ? timeObj.toLocaleString() : '';
+
+                        let displayLabel = rawType;
+                        let isAbnormal = false;
+
+                        if (timeObj) {
+                            const hour = timeObj.getHours();
+                            const minute = timeObj.getMinutes();
+
+                            const isIn = (rawType === 'in' || rawType.includes('上班'));
+                            const isOut = (rawType === 'out' || rawType.includes('下班'));
+
+                            if (isIn) {
+                                if (hour > 9 || (hour === 9 && minute > 0)) {
+                                    isAbnormal = true;
+                                    displayLabel = '上班打卡 [异常(迟到)]';
+                                } else {
+                                    displayLabel = '上班打卡 [正常]';
+                                }
+                            } else if (isOut) {
+                                if (hour < 18) {
+                                    isAbnormal = true;
+                                    displayLabel = '下班打卡 [异常(早退)]';
+                                } else {
+                                    displayLabel = '下班打卡 [正常]';
+                                }
+                            }
+                        }
+
+                        if (rawType.includes('异常') || rawType.includes('迟到') || rawType.includes('早退')) {
+                            isAbnormal = true;
+                        }
+
+                        let icon = isAbnormal ? '🔴' : '🟢';
+                        if (rawType.startsWith('请假')) icon = '🌴';
+                        if (rawType.includes('补卡')) icon = '🛠️';
+
+                        const colorStyle = isAbnormal ? 'color:#dc2626; font-weight:bold;' : 'color:#0f172a;';
+
+                        return `<li><span style="${colorStyle}">${icon} ${displayLabel}</span><span style="color:#64748b;">${timeStr}</span></li>`;
                     }).join('');
                 }
             }
@@ -936,7 +975,6 @@
             const analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
             if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = () => { analyzeAttendanceData(); alert('分析已刷新！'); };
 
-            // 核心统计与异常识别判断函数（升级时间深度计算逻辑）
             async function analyzeAttendanceData() {
                 try {
                     const { data: records } = await sbClient.from('attendance').select('*').limit(100);
@@ -955,12 +993,10 @@
 
                         let isAbnormal = false;
 
-                        // 1. 文案匹配
                         if (typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡')) {
                             isAbnormal = true;
                         }
 
-                        // 2. 深度根据具体时间进行校验判定 (针对直接写 'in' 或 'out' 的历史记录)
                         if (timeObj) {
                             const hour = timeObj.getHours();
                             const minute = timeObj.getMinutes();
@@ -968,11 +1004,9 @@
                             const isIn = (typeStr === 'in' || typeStr.includes('上班'));
                             const isOut = (typeStr === 'out' || typeStr.includes('下班'));
 
-                            // 上班打卡：9点以后 (>= 09:01) 算迟到异常
                             if (isIn && (hour > 9 || (hour === 9 && minute > 0))) {
                                 isAbnormal = true;
                             }
-                            // 下班打卡：18点以前 (< 18:00) 算早退异常
                             if (isOut && hour < 18) {
                                 isAbnormal = true;
                             }
