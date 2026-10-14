@@ -936,6 +936,7 @@
             const analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
             if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = () => { analyzeAttendanceData(); alert('分析已刷新！'); };
 
+            // 核心统计与异常识别判断函数（升级时间深度计算逻辑）
             async function analyzeAttendanceData() {
                 try {
                     const { data: records } = await sbClient.from('attendance').select('*').limit(100);
@@ -948,16 +949,36 @@
                     let normalCount = 0, abnormalCount = 0;
                     const rows = records.map(r => {
                         const fullName = profileMap[r.user_id] || '未知';
-                        // 修正：增加对 [异常]、[迟到]、[早退]、[补卡] 的关键词精准识别
-                        const isAbnormal = r.clock_type && (
-                            r.clock_type.includes('异常') || 
-                            r.clock_type.includes('迟到') || 
-                            r.clock_type.includes('早退') || 
-                            r.clock_type.includes('补卡')
-                        );
-                        const isLeave = r.clock_type && r.clock_type.startsWith('请假');
-                        
-                        const timeStr = r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : '未知';
+                        const typeStr = r.clock_type || '';
+                        const timeObj = r.clock_in_time ? new Date(r.clock_in_time) : (r.clock_time ? new Date(r.clock_time) : null);
+                        const timeStr = timeObj ? timeObj.toLocaleString() : '未知';
+
+                        let isAbnormal = false;
+
+                        // 1. 文案匹配
+                        if (typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡')) {
+                            isAbnormal = true;
+                        }
+
+                        // 2. 深度根据具体时间进行校验判定 (针对直接写 'in' 或 'out' 的历史记录)
+                        if (timeObj) {
+                            const hour = timeObj.getHours();
+                            const minute = timeObj.getMinutes();
+
+                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
+                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
+
+                            // 上班打卡：9点以后 (>= 09:01) 算迟到异常
+                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) {
+                                isAbnormal = true;
+                            }
+                            // 下班打卡：18点以前 (< 18:00) 算早退异常
+                            if (isOut && hour < 18) {
+                                isAbnormal = true;
+                            }
+                        }
+
+                        const isLeave = typeStr.startsWith('请假');
                         let statusBadge = '<span class="badge-normal">正常打卡</span>';
 
                         if (isLeave) { 
@@ -970,7 +991,7 @@
                             normalCount++; 
                         }
 
-                        return `<tr><td>${fullName}</td><td>${r.clock_type}</td><td>${timeStr}</td><td>${statusBadge}</td></tr>`;
+                        return `<tr><td>${fullName}</td><td>${typeStr}</td><td>${timeStr}</td><td>${statusBadge}</td></tr>`;
                     });
 
                     const totalEl = document.getElementById('statTotal');
@@ -1064,12 +1085,18 @@
                         const timeObj = new Date(i.clock_in_time || i.clock_time);
                         const dateStr = timeObj.toLocaleDateString();
                         const timeStr = timeObj.toLocaleTimeString();
-                        const isAbnormal = i.clock_type && (
-                            i.clock_type.includes('异常') || 
-                            i.clock_type.includes('迟到') || 
-                            i.clock_type.includes('早退') || 
-                            i.clock_type.includes('补卡')
-                        );
+                        const typeStr = i.clock_type || '';
+
+                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
+
+                        if (timeObj) {
+                            const hour = timeObj.getHours();
+                            const minute = timeObj.getMinutes();
+                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
+                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
+                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
+                            if (isOut && hour < 18) isAbnormal = true;
+                        }
 
                         return {
                             '员工姓名': profileMap[i.user_id] || '未知员工',
@@ -1091,15 +1118,18 @@
                         const dayKey = timeObj.toISOString().slice(0, 10);
                         userStats[uid].totalDaysSet.add(dayKey);
 
-                        const isAbnormal = i.clock_type && (
-                            i.clock_type.includes('异常') || 
-                            i.clock_type.includes('迟到') || 
-                            i.clock_type.includes('早退') || 
-                            i.clock_type.includes('补卡')
-                        );
-                        if (isAbnormal) {
-                            userStats[uid].abnormalCount++;
+                        const typeStr = i.clock_type || '';
+                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
+                        if (timeObj) {
+                            const hour = timeObj.getHours();
+                            const minute = timeObj.getMinutes();
+                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
+                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
+                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
+                            if (isOut && hour < 18) isAbnormal = true;
                         }
+
+                        if (isAbnormal) userStats[uid].abnormalCount++;
                     });
 
                     excelData.push({}); 
