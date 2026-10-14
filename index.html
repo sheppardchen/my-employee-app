@@ -492,10 +492,8 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            // 打卡围栏半径设置为 250 米
             const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 250 };
 
-            // 设置请假日期的最小值，防止选择过去的日期
             function setupLeaveDateConstraints() {
                 const today = new Date();
                 const year = today.getFullYear();
@@ -578,8 +576,14 @@
                     const { data: { session } } = await sbClient.auth.getSession();
                     if (!session || !session.user) return;
 
-                    const { data: profile } = await sbClient.from('profiles').select('*').eq('id', session.user.id).single();
-                    if (!profile) return;
+                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                    
+                    if (!profile) {
+                        const fullName = session.user.user_metadata?.full_name || session.user.email;
+                        await sbClient.from('profiles').insert([{ id: session.user.id, full_name: fullName, is_approved: false, status: '待审核', role: 'employee' }]);
+                        showSection(pendingSection);
+                        return;
+                    }
 
                     if (!profile.is_approved && profile.status !== '已批准') {
                         showSection(pendingSection);
@@ -612,9 +616,39 @@
                     if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
                     if (password.length < 6) { alert('密码至少需要 6 位！'); return; }
 
-                    const { error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
-                    if (error) alert('注册失败: ' + error.message);
-                    else { alert('🎉 注册提交成功！请等待管理员审批。'); showSection(pendingSection); }
+                    registerBtn.disabled = true;
+                    registerBtn.textContent = '提交中...';
+
+                    try {
+                        const { data, error } = await sbClient.auth.signUp({
+                            email, 
+                            password, 
+                            options: { data: { full_name: name } } 
+                        });
+
+                        if (error) {
+                            alert('注册失败: ' + error.message);
+                            return;
+                        }
+
+                        if (data && data.user) {
+                            await sbClient.from('profiles').upsert([{
+                                id: data.user.id,
+                                full_name: name,
+                                is_approved: false,
+                                status: '待审核',
+                                role: 'employee'
+                            }]);
+                        }
+
+                        alert('🎉 注册提交成功！请等待管理员审批。');
+                        showSection(pendingSection);
+                    } catch (e) {
+                        alert('注册发生异常: ' + e.message);
+                    } finally {
+                        registerBtn.disabled = false;
+                        registerBtn.textContent = '提交注册申请';
+                    }
                 };
             }
 
@@ -625,25 +659,46 @@
                     const password = document.getElementById('loginPassword').value.trim();
                     if (!email || !password) { alert('请输入邮箱和密码！'); return; }
 
-                    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-                    if (error) { alert('登录失败: ' + error.message); return; }
+                    loginBtn.disabled = true;
+                    loginBtn.textContent = '登录中...';
 
-                    const { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).single();
-                    if (!profile || (!profile.is_approved && profile.status !== '已批准')) {
-                        await sbClient.auth.signOut();
-                        showSection(pendingSection);
-                        return;
-                    }
+                    try {
+                        const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+                        if (error) { 
+                            alert('登录失败: ' + error.message); 
+                            return; 
+                        }
 
-                    if (profile.role === 'admin') {
-                        showSection(adminSection);
-                        loadAdminData();
-                        startAdminAutoRefresh();
-                    } else {
-                        showSection(dashboardSection);
-                        const welcomeEl = document.getElementById('welcomeUser');
-                        if (welcomeEl) welcomeEl.textContent = `👋 欢迎，${profile.full_name}`;
-                        loadEmployeeData();
+                        let { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+                        
+                        if (!profile) {
+                            const fullName = data.user.user_metadata?.full_name || email;
+                            await sbClient.from('profiles').insert([{ id: data.user.id, full_name: fullName, is_approved: false, status: '待审核', role: 'employee' }]);
+                            showSection(pendingSection);
+                            return;
+                        }
+
+                        if (!profile.is_approved && profile.status !== '已批准') {
+                            await sbClient.auth.signOut();
+                            showSection(pendingSection);
+                            return;
+                        }
+
+                        if (profile.role === 'admin') {
+                            showSection(adminSection);
+                            loadAdminData();
+                            startAdminAutoRefresh();
+                        } else {
+                            showSection(dashboardSection);
+                            const welcomeEl = document.getElementById('welcomeUser');
+                            if (welcomeEl) welcomeEl.textContent = `👋 欢迎，${profile.full_name}`;
+                            loadEmployeeData();
+                        }
+                    } catch (e) {
+                        alert('登录过程出错: ' + e.message);
+                    } finally {
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = '登录系统';
                     }
                 };
             }
@@ -980,7 +1035,7 @@
 
             function loadAdminData() { loadAdminUsers(); loadAdminLeaves(); loadAdminAttendance(); loadAdminAnnouncements(); analyzeAttendanceData(); populateManualUserSelect(); }
 
-            // 🎯 后台自动静默轮询更新间隔已调整为每两小时一次 (2小时 = 7200000毫秒)
+            // 后台自动静默轮询更新间隔设置为每两小时一次 (2小时 = 7200000毫秒)
             function startAdminAutoRefresh() {
                 setInterval(() => {
                     loadAdminUsers();
@@ -1235,4 +1290,26 @@
                     });
 
                     excelData.push({}); 
-                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ==='
+                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ===' });
+
+                    Object.keys(userStats).forEach(uid => {
+                        const stat = userStats[uid];
+                        excelData.push({
+                            '员工姓名': stat.name,
+                            '打卡日期': `总计出勤天数: ${stat.totalDaysSet.size} 天`,
+                            '打卡详细时间': `异常打卡次数: ${stat.abnormalCount} 次`,
+                            '当日上班时间段/具体说明': stat.abnormalCount === 0 ? '全勤表现良好' : '存在迟到/早退/异常记录，请核查',
+                            '状态判定': stat.abnormalCount === 0 ? '正常' : '需关注'
+                        });
+                    });
+
+                    const ws = XLSX.utils.json_to_sheet(excelData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "全员考勤明细与统计");
+                    XLSX.writeFile(wb, `企业全员考勤及月度统计报表_${new Date().toISOString().slice(0,10)}.xlsx`);
+                };
+            }
+        });
+    </script>
+</body>
+</html>
