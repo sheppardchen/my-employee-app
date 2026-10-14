@@ -276,7 +276,8 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <div class="location-pill">📍 公司考勤打卡点 (250米内有效)</div>
+                <!-- 🎯 已去掉了 “250米内有效” 字样 -->
+                <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
@@ -800,7 +801,7 @@
             if (clockBtn) {
                 clockBtn.onclick = async function() {
                     const tip = document.getElementById('clockResult');
-                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 高德定位获取中 (250米校验)...'; }
+                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 高德定位获取中...'; }
 
                     if (!window.AMap) { alert('高德地图 SDK 未加载，请检查网络！'); return; }
 
