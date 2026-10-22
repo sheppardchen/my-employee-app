@@ -211,6 +211,10 @@
             margin: 12px 0;
             border: 1px solid var(--border-color);
         }
+        
+        /* 折叠面板通用样式 */
+        .collapsible-body { display: none; margin-top: 12px; }
+        .collapsible-header { cursor: pointer; user-select: none; }
     </style>
 </head>
 <body>
@@ -250,7 +254,7 @@
             <button class="switch-btn" id="backToLoginBtn" type="button">返回登录页面</button>
         </div>
 
-        <!-- 员工主功能看板 -->
+        <!-- 员工主功能看板 (客户端) -->
         <div id="dashboardSection" style="display: none;">
             <div class="welcome-bar">
                 <div class="brand-header-flex">
@@ -264,7 +268,7 @@
                 <div id="announcementList">加载公告中...</div>
             </div>
 
-            <!-- 考勤打卡中心 -->
+            <!-- 考勤打卡中心 (客户端打卡历史折叠项) -->
             <div class="card clock-card">
                 <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
@@ -280,12 +284,17 @@
                 <p id="clockResult" style="font-size:13px; font-weight:600; margin-top:8px; min-height: 20px;"></p>
                 
                 <div style="text-align: left; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-                    <h4 style="font-size:14px; margin:0 0 10px 0;">🗓️ 今日考勤与打卡记录：</h4>
-                    <ul id="historyList"><li>加载中...</li></ul>
+                    <div class="collapsible-header" onclick="toggleCollapse('empClockHistoryBody', this)" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: bold; color: var(--text-main);">
+                        <span>🗓️ 今日考勤与打卡记录</span>
+                        <span style="font-size: 12px; color: var(--primary-color);">▶ 点击展开/收起</span>
+                    </div>
+                    <div id="empClockHistoryBody" class="collapsible-body">
+                        <ul id="historyList" style="margin-top: 8px;"><li>加载中...</li></ul>
+                    </div>
                 </div>
             </div>
 
-            <!-- 提交报销申请模块 -->
+            <!-- 提交报销申请模块 (客户端报销历史折叠项) -->
             <div class="card" style="border: 2px solid #8b5cf6;">
                 <h3 style="color:#7c3aed;">📝 提交报销申请</h3>
                 <form id="employeeReimburseForm">
@@ -311,11 +320,18 @@
                 </form>
                 <p id="empReimburseResult" style="text-align:center; font-weight:600; margin-top:10px; font-size:13px;"></p>
 
-                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史报销记录：</h4>
-                <ul id="empReimburseHistoryList"><li>加载中...</li></ul>
+                <div style="margin-top: 16px; border-top:1px solid var(--border-color); padding-top:12px;">
+                    <div class="collapsible-header" onclick="toggleCollapse('empReimburseHistoryBody', this)" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: bold; color: #7c3aed;">
+                        <span>🧾 我的历史报销记录</span>
+                        <span style="font-size: 12px; color: var(--primary-color);">▶ 点击展开/收起</span>
+                    </div>
+                    <div id="empReimburseHistoryBody" class="collapsible-body">
+                        <ul id="empReimburseHistoryList" style="margin-top: 8px;"><li>加载中...</li></ul>
+                    </div>
+                </div>
             </div>
 
-            <!-- 请假申请模块 -->
+            <!-- 请假申请模块 (客户端请假历史折叠项) -->
             <div class="card">
                 <h3>
                     <span>📝 提交请假申请</span>
@@ -337,8 +353,15 @@
                 <button id="submitLeaveBtn" type="button">提交请假申请</button>
                 <p id="leaveResult" style="text-align:center; font-weight:600; margin-top:10px; font-size:13px;"></p>
                 
-                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史请假记录：</h4>
-                <ul id="leaveHistoryList"><li>加载中...</li></ul>
+                <div style="margin-top: 16px; border-top:1px solid var(--border-color); padding-top:12px;">
+                    <div class="collapsible-header" onclick="toggleCollapse('empLeaveHistoryBody', this)" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: bold; color: var(--text-main);">
+                        <span>📌 我的历史请假记录</span>
+                        <span style="font-size: 12px; color: var(--primary-color);">▶ 点击展开/收起</span>
+                    </div>
+                    <div id="empLeaveHistoryBody" class="collapsible-body">
+                        <ul id="leaveHistoryList" style="margin-top: 8px;"><li>加载中...</li></ul>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -420,49 +443,59 @@
                 <button id="submitManualClockBtn" type="button" style="background: #f59e0b;">💾 提交补充打卡记录</button>
             </div>
 
-            <!-- 4. 智能考勤分析 -->
-            <div class="card" style="border: 2px solid #10b981;">
-                <h3>
+            <!-- 4. 智能考勤分析 (折叠项) -->
+            <div class="card collapsible-card" style="border: 2px solid #10b981;">
+                <h3 class="collapsible-header" onclick="toggleCollapse('analyzeBody', this)">
                     <span>📈 智能考勤分析与统计</span>
-                    <button id="analyzeAttendanceBtn" type="button" class="btn-sm" style="background: #10b981;">📊 手动刷新分析</button>
+                    <span style="font-size: 13px; color: var(--primary-color);">▶ 点击展开/收起</span>
                 </h3>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡/考勤人次</div>
-                        <div id="statTotal" class="stat-num">0</div>
+                <div id="analyzeBody" class="collapsible-body">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                        <button id="analyzeAttendanceBtn" type="button" class="btn-sm" style="background: #10b981; width: auto;">📊 手动刷新分析</button>
                     </div>
-                    <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">正常打卡 / 准假</div>
-                        <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div style="font-size: 12px; color: var(--text-secondary);">总打卡/考勤人次</div>
+                            <div id="statTotal" class="stat-num">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div style="font-size: 12px; color: var(--text-secondary);">正常打卡 / 准假</div>
+                            <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div style="font-size: 12px; color: var(--text-secondary);">补卡/异常</div>
+                            <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
+                        </div>
                     </div>
-                    <div class="stat-box">
-                        <div style="font-size: 12px; color: var(--text-secondary);">补卡/异常</div>
-                        <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
+                    <div style="overflow-x: auto; max-height: 220px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>员工姓名</th><th>考勤类型</th><th>时间 / 备注</th><th>状态识别</th></tr>
+                            </thead>
+                            <tbody id="adminAttendanceAnalysisList"><tr><td colspan="4">加载分析中...</td></tr></tbody>
+                        </table>
                     </div>
-                </div>
-                <div style="overflow-x: auto; max-height: 220px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr><th>员工姓名</th><th>考勤类型</th><th>时间 / 备注</th><th>状态识别</th></tr>
-                        </thead>
-                        <tbody id="adminAttendanceAnalysisList"><tr><td colspan="4">加载分析中...</td></tr></tbody>
-                    </table>
                 </div>
             </div>
 
-            <!-- 5. 全公司打卡动态监控 -->
-            <div class="card" style="border: 2px solid #3b82f6;">
-                <h3>
+            <!-- 5. 全公司打卡动态监控 (折叠项) -->
+            <div class="card collapsible-card" style="border: 2px solid #3b82f6;">
+                <h3 class="collapsible-header" onclick="toggleCollapse('attendanceBody', this)">
                     <span>⚡ 全公司考勤打卡实时监控</span>
-                    <button id="refreshAttendanceBtn" type="button" class="btn-sm" style="background: #2563eb;">🔄 刷新数据列表</button>
+                    <span style="font-size: 13px; color: var(--primary-color);">▶ 点击展开/收起</span>
                 </h3>
-                <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr><th>员工姓名</th><th>打卡类型</th><th>记录时间与情况</th><th>状态</th></tr>
-                        </thead>
-                        <tbody id="adminAttendanceList"><tr><td colspan="4">加载中...</td></tr></tbody>
-                    </table>
+                <div id="attendanceBody" class="collapsible-body">
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                        <button id="refreshAttendanceBtn" type="button" class="btn-sm" style="background: #2563eb; width: auto;">🔄 刷新数据列表</button>
+                    </div>
+                    <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr><th>员工姓名</th><th>打卡类型</th><th>记录时间与情况</th><th>状态</th></tr>
+                            </thead>
+                            <tbody id="adminAttendanceList"><tr><td colspan="4">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -480,28 +513,39 @@
                 </div>
             </div>
 
-            <!-- 7. 注册与请假审核 -->
-            <div class="card">
-                <h3>👥 员工注册审核</h3>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead><tr><th>姓名</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
-                        <tbody id="adminUserList"><tr><td colspan="4">加载中...</td></tr></tbody>
-                    </table>
+            <!-- 7. 员工注册审核 (折叠项) -->
+            <div class="card collapsible-card">
+                <h3 class="collapsible-header" onclick="toggleCollapse('userBody', this)">
+                    <span>👥 员工注册审核</span>
+                    <span style="font-size: 13px; color: var(--primary-color);">▶ 点击展开/收起</span>
+                </h3>
+                <div id="userBody" class="collapsible-body">
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead><tr><th>姓名</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+                            <tbody id="adminUserList"><tr><td colspan="4">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="card">
-                <h3>📋 员工请假审批</h3>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead><tr><th>姓名(类型)</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
-                        <tbody id="adminLeaveList"><tr><td colspan="5">加载中...</td></tr></tbody>
-                    </table>
+            <!-- 8. 员工请假审批 (折叠项) -->
+            <div class="card collapsible-card">
+                <h3 class="collapsible-header" onclick="toggleCollapse('leaveBody', this)">
+                    <span>📋 员工请假审批</span>
+                    <span style="font-size: 13px; color: var(--primary-color);">▶ 点击展开/收起</span>
+                </h3>
+                <div id="leaveBody" class="collapsible-body">
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead><tr><th>姓名(类型)</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
+                            <tbody id="adminLeaveList"><tr><td colspan="5">加载中...</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- 8. 导出报表 -->
+            <!-- 9. 导出报表 -->
             <div class="card">
                 <h3>📊 导出考勤报表</h3>
                 <button id="exportExcelBtn" type="button" style="background: #059669;">📥 导出全员考勤明细及月度统计 Excel</button>
@@ -591,6 +635,20 @@
             if(modalEl) modalEl.style.display = 'none';
         }
 
+        // 全局折叠切换函数
+        function toggleCollapse(bodyId, headerEl) {
+            var bodyEl = document.getElementById(bodyId);
+            var indicator = headerEl.querySelector('span:last-child');
+            if (!bodyEl) return;
+            if (bodyEl.style.display === 'block') {
+                bodyEl.style.display = 'none';
+                if (indicator) indicator.textContent = '▶ 点击展开/收起';
+            } else {
+                bodyEl.style.display = 'block';
+                if (indicator) indicator.textContent = '▼ 点击展开/收起';
+            }
+        }
+
         // 统一在页面加载完成后安全初始化所有事件监听
         document.addEventListener("DOMContentLoaded", function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
@@ -611,7 +669,7 @@
 
             var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
             var empReimbursementsCache = [];
-            var empLeavesCache = []; // 客户端请假缓存
+            var empLeavesCache = [];
 
             var loginSection = document.getElementById('loginSection');
             var registerSection = document.getElementById('registerSection');
@@ -1152,7 +1210,6 @@
                 }
             }
 
-            // 员工端查看请假详情弹窗触发
             window.viewLeaveDetail = function(idx) {
                 var item = empLeavesCache[idx];
                 if (!item) return;
@@ -1287,7 +1344,6 @@
             var analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
             if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
 
-            // 控制台智能考勤分析（自动过滤请假类型，确保不计入考勤异常或总数）
             async function analyzeAttendanceData() {
                 var aRes = await sbClient.from('attendance').select('*').limit(200);
                 var pRes = await sbClient.from('profiles').select('*');
@@ -1397,7 +1453,6 @@
                 loadAdminLeaves(); loadAdminAttendance();
             };
 
-            // 控制台实时考勤动态监控（自动过滤请假记录）
             async function loadAdminAttendance() {
                 var aRes = await sbClient.from('attendance').select('*').limit(100);
                 var pRes = await sbClient.from('profiles').select('*');
