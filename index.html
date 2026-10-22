@@ -540,8 +540,6 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("正在初始化系统...");
-
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
 
@@ -549,7 +547,6 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            // 电子围栏基准：550 米
             const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
 
             const loginSection = document.getElementById('loginSection');
@@ -560,7 +557,6 @@
 
             let currentClockState = 'in';
 
-            // 视图切换辅助函数
             function showSection(section) {
                 if(loginSection) loginSection.style.display = 'none';
                 if(registerSection) registerSection.style.display = 'none';
@@ -570,7 +566,7 @@
                 if(section) section.style.display = 'block';
             }
 
-            // 视图切换按钮绑定
+            // 视图切换按钮
             const toRegisterBtn = document.getElementById('toRegisterBtn');
             if (toRegisterBtn) toRegisterBtn.onclick = () => showSection(registerSection);
             const toLoginBtn = document.getElementById('toLoginBtn');
@@ -578,17 +574,14 @@
             const backToLoginBtn = document.getElementById('backToLoginBtn');
             if (backToLoginBtn) backToLoginBtn.onclick = () => showSection(loginSection);
 
-            // 1. 登录逻辑（重点重构优化）
-            const doLogin = async function() {
-                const emailInput = document.getElementById('loginEmail');
-                const passwordInput = document.getElementById('loginPassword');
+            // 🎯 手机端强兼容登录逻辑
+            const handleLogin = async function() {
+                const email = document.getElementById('loginEmail').value.trim();
+                const password = document.getElementById('loginPassword').value.trim();
                 const loginBtn = document.getElementById('loginBtn');
 
-                const email = emailInput ? emailInput.value.trim() : '';
-                const password = passwordInput ? passwordInput.value.trim() : '';
-
                 if (!email || !password) {
-                    alert('请输入邮箱和密码！');
+                    alert('请输入工作邮箱和登录密码！');
                     return;
                 }
 
@@ -598,24 +591,21 @@
                 }
 
                 try {
-                    console.log("正在尝试登录账号:", email);
                     const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
                     
                     if (error) { 
                         alert('登录失败: ' + error.message); 
-                        console.error("Supabase 登录错误:", error);
                         return; 
                     }
 
-                    console.log("登录成功，获取用户 Profile 信息...", data.user.id);
-                    let { data: profile, error: profileErr } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-                    
-                    if (profileErr) {
-                        console.error("读取 Profile 错误:", profileErr);
+                    if (!data || !data.user) {
+                        alert('登录失败：未获取到用户信息');
+                        return;
                     }
 
+                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+                    
                     if (!profile) {
-                        // 如果 profile 不存在，容错自动补建
                         const fullName = data.user.user_metadata?.full_name || email;
                         const { data: newProfile } = await sbClient.from('profiles').insert([{ id: data.user.id, full_name: fullName, is_approved: false, status: '待审核', role: 'employee' }]).select().single();
                         profile = newProfile || { role: 'employee', is_approved: false };
@@ -641,8 +631,7 @@
                         loadEmployeeData();
                     }
                 } catch (e) {
-                    console.error("登录异常异常:", e);
-                    alert('登录过程出错: ' + e.message);
+                    alert('登录发生异常: ' + (e.message || e));
                 } finally {
                     if (loginBtn) {
                         loginBtn.disabled = false;
@@ -652,17 +641,73 @@
             };
 
             const loginBtn = document.getElementById('loginBtn');
-            if (loginBtn) loginBtn.onclick = doLogin;
-
-            // 回车键快捷登录
-            const pwdInput = document.getElementById('loginPassword');
-            if (pwdInput) {
-                pwdInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') doLogin();
-                });
+            if (loginBtn) {
+                loginBtn.onclick = handleLogin;
+                // 同时适配移动端 touchstart 提升响应速度
+                loginBtn.ontouchend = function(e) {
+                    e.preventDefault();
+                    handleLogin();
+                };
             }
 
-            // 2. 自动检查 Session
+            // 🎯 手机端强兼容注册逻辑
+            const handleRegister = async function() {
+                const name = document.getElementById('regName').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const password = document.getElementById('regPassword').value.trim();
+                const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+                const registerBtn = document.getElementById('registerBtn');
+
+                if (!name || !email || !password) { alert('请完整填写基本信息！'); return; }
+                if (password !== confirmPassword) { alert('两次输入的密码不一致！'); return; }
+                if (password.length < 6) { alert('密码长度至少需要 6 位！'); return; }
+
+                if (registerBtn) {
+                    registerBtn.disabled = true;
+                    registerBtn.textContent = '提交中...';
+                }
+
+                try {
+                    const { data, error } = await sbClient.auth.signUp({
+                        email, 
+                        password, 
+                        options: { data: { full_name: name } } 
+                    });
+
+                    if (error) { alert('注册失败: ' + error.message); return; }
+
+                    if (data && data.user) {
+                        await sbClient.from('profiles').upsert([{
+                            id: data.user.id,
+                            full_name: name,
+                            is_approved: false,
+                            status: '待审核',
+                            role: 'employee'
+                        }]);
+                    }
+
+                    alert('🎉 注册提交成功！请等待管理员审批。');
+                    showSection(pendingSection);
+                } catch (e) {
+                    alert('注册发生异常: ' + (e.message || e));
+                } finally {
+                    if (registerBtn) {
+                        registerBtn.disabled = false;
+                        registerBtn.textContent = '提交注册申请';
+                    }
+                }
+            };
+
+            const registerBtn = document.getElementById('registerBtn');
+            if (registerBtn) {
+                registerBtn.onclick = handleRegister;
+                registerBtn.ontouchend = function(e) {
+                    e.preventDefault();
+                    handleRegister();
+                };
+            }
+
+            // 自动检查 Session
             async function checkSession() {
                 try {
                     const { data: { session } } = await sbClient.auth.getSession();
@@ -702,59 +747,11 @@
             }
             checkSession();
 
-            // 3. 注册逻辑
-            const registerBtn = document.getElementById('registerBtn');
-            if (registerBtn) {
-                registerBtn.onclick = async function() {
-                    const name = document.getElementById('regName').value.trim();
-                    const email = document.getElementById('regEmail').value.trim();
-                    const password = document.getElementById('regPassword').value.trim();
-                    const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
-
-                    if (!name || !email || !password) { alert('请完整填写基本信息！'); return; }
-                    if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
-                    if (password.length < 6) { alert('密码至少需要 6 位！'); return; }
-
-                    registerBtn.disabled = true;
-                    registerBtn.textContent = '提交中...';
-
-                    try {
-                        const { data, error } = await sbClient.auth.signUp({
-                            email, 
-                            password, 
-                            options: { data: { full_name: name } } 
-                        });
-
-                        if (error) { alert('注册失败: ' + error.message); return; }
-
-                        if (data && data.user) {
-                            await sbClient.from('profiles').upsert([{
-                                id: data.user.id,
-                                full_name: name,
-                                is_approved: false,
-                                status: '待审核',
-                                role: 'employee'
-                            }]);
-                        }
-
-                        alert('🎉 注册提交成功！请等待管理员审批。');
-                        showSection(pendingSection);
-                    } catch (e) {
-                        alert('注册发生异常: ' + e.message);
-                    } finally {
-                        registerBtn.disabled = false;
-                        registerBtn.textContent = '提交注册申请';
-                    }
-                };
-            }
-
-            // 退出事件
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) logoutBtn.onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
             const adminLogoutBtn = document.getElementById('adminLogoutBtn');
             if (adminLogoutBtn) adminLogoutBtn.onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
 
-            // 定时刷新时钟
             setInterval(() => {
                 const now = new Date();
                 const clockEl = document.getElementById('liveClock');
@@ -1005,12 +1002,11 @@
                         if (rawType.includes('补卡')) icon = '🛠️';
 
                         const colorStyle = isAbnormal ? 'color:#dc2626; font-weight:bold;' : 'color:#0f172a;';
-                        return `<li><span style="${colorStyle}">${icon} ${displayLabel}</span><span style="color:#64748b;">${timeStr}</span></li>`;
+                        return `<li><span style="${colorStyle}">${icon}${displayLabel}</span><span style="color:#64748b;">${timeStr}</span></li>`;
                     }).join('');
                 }
             }
 
-            // 员工表单提交报销
             const reimburseForm = document.getElementById('employeeReimburseForm');
             if (reimburseForm) {
                 reimburseForm.onsubmit = async function(e) {
@@ -1088,7 +1084,6 @@
                 }).join('');
             }
 
-            // 地图选点定位
             let mapInstance = null;
             let markerInstance = null;
             let tempSelectedLat = COMPANY_LOCATION.latitude;
@@ -1159,7 +1154,6 @@
                 };
             }
 
-            // 请假提交
             const submitLeaveBtn = document.getElementById('submitLeaveBtn');
             if (submitLeaveBtn) {
                 submitLeaveBtn.onclick = async function() {
@@ -1203,7 +1197,6 @@
                 }
             }
 
-            // 管理员后台逻辑
             function loadAdminData() { 
                 loadAdminUsers(); 
                 loadAdminLeaves(); 
@@ -1255,8 +1248,7 @@
                     return `
                         <tr>
                             <td><strong>${item.applicant_name}</strong></td>
-                            <td>${item.apply_date}</td>
-                            <td style="font-weight:bold; color:#0f172a;">$${parseFloat(item.amount).toFixed(2)}</td>
+                            <td>${item.apply_date}</td> <td style="font-weight:bold; color:#0f172a;">$${parseFloat(item.amount).toFixed(2)}</td>
                             <td>
                                 ${item.receipt_url 
                                     ? `<a href="${item.receipt_url}" target="_blank"><img src="${item.receipt_url}" class="receipt-preview" title="点击查看发票原图"/></a>` 
@@ -1291,7 +1283,7 @@
             async function populateManualUserSelect() {
                 const { data: profiles } = await sbClient.from('profiles').select('*');
                 const select = document.getElementById('manualUserSelect');
-                if (select && profiles) select.innerHTML = profiles.map(p => `<option value="${p.id || p.user_id}">${p.full_name || '未命名员工'}</option>`).join('');
+                if (select && profiles) select.innerHTML = profiles.map(p => `<option value="${p.id \vert{}\vert{} p.user_id}">${p.full_name || '未命名员工'}</option>`).join('');
             }
 
             const submitManualClockBtn = document.getElementById('submitManualClockBtn');
@@ -1429,126 +1421,4 @@
                     const uid = u.id || u.user_id;
                     let isApproved = u.is_approved || u.status === '已批准';
                     let isRejected = u.status === '已拒绝';
-                    return `<tr><td>${u.full_name || '未命名'}</td><td>${u.created_at ? u.created_at.slice(0,10) : ''}</td><td>${isApproved?'已批准':isRejected?'已拒绝':'待审核'}</td><td class="action-btns"><button class="btn-success" ${isApproved||isRejected?'disabled':''} onclick="reviewUser('${uid}', true)">批准</button><button class="btn-danger" ${isApproved||isRejected?'disabled':''} onclick="reviewUser('${uid}', false)">拒绝</button></td></tr>`;
-                }).join('');
-            }
-
-            window.reviewUser = async (id, isApproved) => {
-                await sbClient.from('profiles').update({ is_approved: isApproved, status: isApproved ? '已批准' : '已拒绝' }).eq('id', id);
-                loadAdminUsers();
-            };
-
-            async function loadAdminLeaves() {
-                const { data: leaves } = await sbClient.from('leave_requests').select('*');
-                const { data: profiles } = await sbClient.from('profiles').select('*');
-                const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
-
-                const tbody = document.getElementById('adminLeaveList');
-                if(tbody) tbody.innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假申请</td></tr>' : leaves.map(l => {
-                    const fullName = profileMap[l.user_id] || '未知';
-                    const isProcessed = l.status !== '待审批';
-                    return `<tr><td>${fullName} (${l.request_type})</td><td>${l.start_date?l.start_date.slice(0,10):''}~${l.end_date?l.end_date.slice(0,10):''}</td><td>${l.reason}</td><td>${l.status}</td><td class="action-btns"><button class="btn-success" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', '${l.user_id}', '${l.request_type}', '${l.start_date}', '${l.end_date}', '已批准')">批准</button><button class="btn-danger" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', false, false, false, false, '已拒绝')">拒绝</button></td></tr>`;
-                }).join('');
-            }
-
-            window.updateLeave = async (leaveId, userId, leaveType, startStr, endStr, status) => {
-                await sbClient.from('leave_requests').update({ status }).eq('id', leaveId);
-                if (status === '已批准') {
-                    await sbClient.from('attendance').insert([{ user_id: userId, clock_type: `请假(${leaveType})`, clock_in_time: new Date().toISOString() }]);
-                }
-                loadAdminLeaves(); loadAdminAttendance(); analyzeAttendanceData();
-            };
-
-            async function loadAdminAttendance() {
-                const { data: records } = await sbClient.from('attendance').select('*').limit(50);
-                const { data: profiles } = await sbClient.from('profiles').select('*');
-                const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
-
-                const tbody = document.getElementById('adminAttendanceList');
-                if(tbody) tbody.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(r => `<tr><td>${profileMap[r.user_id] || '未知'}</td><td>${r.clock_type}</td><td>${r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : ''}</td></tr>`).join('');
-            }
-
-            const exportExcelBtn = document.getElementById('exportExcelBtn');
-            if (exportExcelBtn) {
-                exportExcelBtn.onclick = async function() {
-                    const { data: records } = await sbClient.from('attendance').select('*');
-                    const { data: profiles } = await sbClient.from('profiles').select('*');
-                    const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
-
-                    if (!records) return;
-
-                    const excelData = records.map(i => {
-                        const timeObj = new Date(i.clock_in_time || i.clock_time);
-                        const dateStr = timeObj.toLocaleDateString();
-                        const timeStr = timeObj.toLocaleTimeString();
-                        const typeStr = i.clock_type || '';
-
-                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
-
-                        if (timeObj) {
-                            const hour = timeObj.getHours();
-                            const minute = timeObj.getMinutes();
-                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
-                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
-                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
-                            if (isOut && hour < 18) isAbnormal = true;
-                        }
-
-                        return {
-                            '员工姓名': profileMap[i.user_id] || '未知员工',
-                            '打卡日期': dateStr,
-                            '打卡详细时间': timeStr,
-                            '当日上班时间段/具体说明': i.clock_type,
-                            '状态判定': isAbnormal ? '异常 / 违规' : '正常'
-                        };
-                    });
-
-                    const userStats = {};
-                    records.forEach(i => {
-                        const uid = i.user_id;
-                        const name = profileMap[uid] || '未知员工';
-                        if (!userStats[uid]) {
-                            userStats[uid] = { name: name, totalDaysSet: new Set(), abnormalCount: 0 };
-                        }
-                        const timeObj = new Date(i.clock_in_time || i.clock_time);
-                        const dayKey = timeObj.toISOString().slice(0, 10);
-                        userStats[uid].totalDaysSet.add(dayKey);
-
-                        const typeStr = i.clock_type || '';
-                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
-                        if (timeObj) {
-                            const hour = timeObj.getHours();
-                            const minute = timeObj.getMinutes();
-                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
-                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
-                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
-                            if (isOut && hour < 18) isAbnormal = true;
-                        }
-
-                        if (isAbnormal) userStats[uid].abnormalCount++;
-                    });
-
-                    excelData.push({}); 
-                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ===' });
-
-                    Object.keys(userStats).forEach(uid => {
-                        const stat = userStats[uid];
-                        excelData.push({
-                            '员工姓名': stat.name,
-                            '打卡日期': `总计出勤天数: ${stat.totalDaysSet.size} 天`,
-                            '打卡详细时间': `异常打卡次数: ${stat.abnormalCount} 次`,
-                            '当日上班时间段/具体说明': stat.abnormalCount === 0 ? '全勤表现良好' : '存在迟到/早退/异常记录，请核查',
-                            '状态判定': stat.abnormalCount === 0 ? '正常' : '需关注'
-                        });
-                    });
-
-                    const ws = XLSX.utils.json_to_sheet(excelData);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "全员考勤明细与统计");
-                    XLSX.writeFile(wb, `企业全员考勤及月度统计报表_${new Date().toISOString().slice(0,10)}.xlsx`);
-                };
-            }
-        });
-    </script>
-</body>
-</html>
+                    return `<tr><td>${u.full_name \vert{}\vert{} '未命名'}</td><td>${u.created_at ? u.created_at.slice(0,10) : ''}</td>
