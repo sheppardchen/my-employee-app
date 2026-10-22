@@ -547,6 +547,23 @@
         </div>
     </div>
 
+    <!-- 员工请假记录详情弹窗 -->
+    <div id="leaveDetailModal" class="modal-overlay">
+        <div class="modal-card">
+            <h3 style="margin:0 0 16px 0; border-bottom:1px solid var(--border-color); padding-bottom:10px;">📌 请假申请明细</h3>
+            <div style="font-size: 14px; line-height: 1.8; color: var(--text-main);">
+                <p style="margin:6px 0;"><strong>请假类型：</strong><span id="leaveDetailType" style="color: var(--primary-color); font-weight: bold;">-</span></p>
+                <p style="margin:6px 0;"><strong>开始日期：</strong><span id="leaveDetailStart">-</span></p>
+                <p style="margin:6px 0;"><strong>结束日期：</strong><span id="leaveDetailEnd">-</span></p>
+                <p style="margin:6px 0;"><strong>审批状态：</strong><span id="leaveDetailStatus">-</span></p>
+                <p style="margin:6px 0;"><strong>请假事由：</strong><span id="leaveDetailReason" style="color: var(--text-secondary);">-</span></p>
+            </div>
+            <div style="margin-top: 20px;">
+                <button id="closeLeaveDetailBtn" type="button" style="background: #64748b;">关闭详情</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 高德地图选点弹窗 -->
     <div id="mapModal" class="modal-overlay">
         <div class="modal-card" style="max-width:600px;">
@@ -594,6 +611,7 @@
 
             var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
             var empReimbursementsCache = [];
+            var empLeavesCache = []; // 客户端请假缓存
 
             var loginSection = document.getElementById('loginSection');
             var registerSection = document.getElementById('registerSection');
@@ -1118,17 +1136,46 @@
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
                 var res = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).order('created_at', { ascending: false }).limit(10);
-                var data = res.data;
+                empLeavesCache = res.data || [];
                 var listEl = document.getElementById('leaveHistoryList');
                 if(listEl) {
-                    listEl.innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(function(i) {
+                    listEl.innerHTML = (empLeavesCache.length === 0) ? '<li>暂无请假记录</li>' : empLeavesCache.map(function(i, idx) {
                         var cls = i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending';
                         return '<li>' +
                             '<span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span>' +
-                            '<span class="badge-' + cls + '">' + i.status + '</span>' +
+                            '<span style="display:flex; align-items:center; gap:8px;">' +
+                                '<span class="badge-' + cls + '">' + i.status + '</span>' +
+                                '<button class="btn-sm" style="background:#2563eb; color:white; padding:2px 8px; font-size:11px;" onclick="viewLeaveDetail(' + idx + ')">🔍 详情</button>' +
+                            '</span>' +
                         '</li>';
                     }).join('');
                 }
+            }
+
+            // 员工端查看请假详情弹窗触发
+            window.viewLeaveDetail = function(idx) {
+                var item = empLeavesCache[idx];
+                if (!item) return;
+                document.getElementById('leaveDetailType').textContent = item.request_type || '-';
+                document.getElementById('leaveDetailStart').textContent = item.start_date ? item.start_date.slice(0,10) : '-';
+                document.getElementById('leaveDetailEnd').textContent = item.end_date ? item.end_date.slice(0,10) : '-';
+                
+                var statusCn = item.status === '已批准' ? '✅ 已批准' : item.status === '已拒绝' ? '❌ 已拒绝' : '⏳ 待审批';
+                var statusColor = item.status === '已批准' ? '#16a34a' : item.status === '已拒绝' ? '#dc2626' : '#d97706';
+                var statusEl = document.getElementById('leaveDetailStatus');
+                statusEl.textContent = statusCn;
+                statusEl.style.color = statusColor;
+                statusEl.style.fontWeight = 'bold';
+
+                document.getElementById('leaveDetailReason').textContent = item.reason || '无';
+                document.getElementById('leaveDetailModal').style.display = 'flex';
+            };
+
+            var closeLeaveDetailBtn = document.getElementById('closeLeaveDetailBtn');
+            if(closeLeaveDetailBtn) {
+                closeLeaveDetailBtn.onclick = function() {
+                    document.getElementById('leaveDetailModal').style.display = 'none';
+                };
             }
 
             function loadAdminData() {
@@ -1240,8 +1287,9 @@
             var analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
             if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
 
+            // 控制台智能考勤分析（自动过滤请假类型，确保不计入考勤异常或总数）
             async function analyzeAttendanceData() {
-                var aRes = await sbClient.from('attendance').select('*').limit(100);
+                var aRes = await sbClient.from('attendance').select('*').limit(200);
                 var pRes = await sbClient.from('profiles').select('*');
                 var records = aRes.data;
                 var profiles = pRes.data;
@@ -1249,10 +1297,15 @@
                 if (profiles) { profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; }); }
                 if(!records) return;
 
+                var cleanRecords = records.filter(function(r) {
+                    var typeStr = String(r.clock_type || '');
+                    return typeStr.indexOf('请假') === -1;
+                });
+
                 var normal = 0, abnormal = 0;
                 var listEl = document.getElementById('adminAttendanceAnalysisList');
                 if(listEl) {
-                    listEl.innerHTML = records.map(function(r) {
+                    listEl.innerHTML = cleanRecords.map(function(r) {
                         var cType = formatClockType(r.clock_type);
                         var isAbab = isAbnormalType(cType);
                         if(isAbab) abnormal++; else normal++;
@@ -1267,7 +1320,7 @@
                 var statTotal = document.getElementById('statTotal');
                 var statNormal = document.getElementById('statNormal');
                 var statLate = document.getElementById('statLate');
-                if(statTotal) statTotal.textContent = records.length;
+                if(statTotal) statTotal.textContent = cleanRecords.length;
                 if(statNormal) statNormal.textContent = normal;
                 if(statLate) statLate.textContent = abnormal;
             }
@@ -1341,19 +1394,25 @@
             }
             window.reviewLeave = async function(id, uid, type, status) {
                 await sbClient.from('leave_requests').update({ status: status }).eq('id', id);
-                if(status === '已批准') await sbClient.from('attendance').insert([{ user_id: uid, clock_type: '请假(' + type + ')', clock_in_time: new Date().toISOString() }]);
                 loadAdminLeaves(); loadAdminAttendance();
             };
 
+            // 控制台实时考勤动态监控（自动过滤请假记录）
             async function loadAdminAttendance() {
-                var aRes = await sbClient.from('attendance').select('*').limit(50);
+                var aRes = await sbClient.from('attendance').select('*').limit(100);
                 var pRes = await sbClient.from('profiles').select('*');
                 var records = aRes.data;
                 var profiles = pRes.data;
                 var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+                
+                var cleanRecords = records ? records.filter(function(r) {
+                    var typeStr = String(r.clock_type || '');
+                    return typeStr.indexOf('请假') === -1;
+                }) : [];
+
                 var listEl = document.getElementById('adminAttendanceList');
                 if(listEl) {
-                    listEl.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="4">暂无记录</td></tr>' : records.map(function(r) {
+                    listEl.innerHTML = (cleanRecords.length === 0) ? '<tr><td colspan="4">暂无记录</td></tr>' : cleanRecords.map(function(r) {
                         var cType = formatClockType(r.clock_type);
                         var isAb = isAbnormalType(cType);
                         return '<tr>' +
@@ -1376,7 +1435,13 @@
                     var profiles = pRes.data;
                     var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
                     if(!records) return;
-                    var excelData = records.map(function(i) {
+
+                    var cleanRecords = records.filter(function(i) {
+                        var typeStr = String(i.clock_type || '');
+                        return typeStr.indexOf('请假') === -1;
+                    });
+
+                    var excelData = cleanRecords.map(function(i) {
                         return {
                             '员工姓名': pMap[i.user_id] || '未知',
                             '打卡时间': new Date(i.clock_in_time || i.clock_time).toLocaleString(),
