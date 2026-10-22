@@ -97,7 +97,7 @@
             transition: all 0.2s;
         }
         button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3); }
-        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed !important; box-shadow: none !important; opacity: 0.7; }
+        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed !important; box-shadow: none !important; opacity: 0.7; transform: none !important; }
 
         .switch-btn { background: transparent; color: var(--primary-color); margin-top: 10px; font-size: 14px; box-shadow: none; }
         .switch-btn:hover { background: #e0e7ff; transform: none; }
@@ -183,9 +183,10 @@
         .flex-row { display: flex; gap: 10px; }
         .flex-row .input-group { flex: 1; }
 
-        .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; }
+        .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: transform 0.2s; }
+        .receipt-preview:hover { transform: scale(1.05); }
 
-        /* 弹窗遮罩 */
+        /* 模态框遮罩 */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -299,7 +300,6 @@
                             <input type="date" id="empApplyDate" required>
                         </div>
                         <div class="input-group">
-                            <!-- 去掉美金符号 -->
                             <label>报销金额 *</label>
                             <input type="number" step="0.01" id="empReimburseAmount" placeholder="0.00" required>
                         </div>
@@ -507,6 +507,20 @@
         </div>
     </div>
 
+    <!-- 管理员图片大图预览弹窗（带明确关闭按钮） -->
+    <div id="imagePreviewModal" class="modal-overlay" onclick="closeImagePreview()">
+        <div class="modal-card" style="max-width: 600px; text-align: center; background: #0f172a; padding: 16px;" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: white;">
+                <span style="font-size: 14px;">🧾 报销凭证大图预览</span>
+                <button type="button" onclick="closeImagePreview()" style="width: auto; padding: 6px 16px; background: #ef4444; font-size: 13px;">✖ 关闭返回</button>
+            </div>
+            <img id="previewLargeImg" src="" alt="大图凭证" style="width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; background: #000;">
+            <div style="margin-top: 12px;">
+                <button type="button" onclick="closeImagePreview()" style="background: #64748b; width: auto; padding: 8px 24px;">关闭大图返回控制台</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 员工报销记录详情弹窗 -->
     <div id="reimburseDetailModal" class="modal-overlay">
         <div class="modal-card">
@@ -519,8 +533,9 @@
                 <p style="margin:4px 0;"><strong>审批备注：</strong><span id="detailRemark" style="color: var(--text-secondary);">-</span></p>
                 <div style="margin-top:12px;">
                     <strong style="display:block; margin-bottom:6px;">报销凭证图片：</strong>
-                    <div id="detailReceiptContainer" style="text-align: center; background:#f8fafc; padding:10px; border-radius:10px; border: 1px solid var(--border-color);">
-                        <img id="detailReceiptImg" src="" alt="凭证" style="max-width:100%; max-height:260px; object-fit:contain; border-radius:6px;">
+                    <div style="text-align: center; background:#f8fafc; padding:10px; border-radius:10px; border: 1px solid var(--border-color);">
+                        <img id="detailReceiptImg" src="" alt="凭证" style="max-width:100%; max-height:260px; object-fit:contain; border-radius:6px; cursor:pointer;" onclick="openImagePreview(this.src)">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">点击图片可放大查看</div>
                     </div>
                 </div>
             </div>
@@ -545,6 +560,15 @@
     </div>
 
     <script>
+        function openImagePreview(url) {
+            if(!url) return;
+            document.getElementById('previewLargeImg').src = url;
+            document.getElementById('imagePreviewModal').style.display = 'flex';
+        }
+        function closeImagePreview() {
+            document.getElementById('imagePreviewModal').style.display = 'none';
+        }
+
         window.addEventListener('load', function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
@@ -560,7 +584,7 @@
             }
 
             var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
-            var empReimbursementsCache = []; // 缓存当前员工报销数据
+            var empReimbursementsCache = [];
 
             var loginSection = document.getElementById('loginSection');
             var registerSection = document.getElementById('registerSection');
@@ -596,7 +620,6 @@
             document.getElementById('toLoginBtn').onclick = function() { showSection(loginSection); };
             document.getElementById('backToLoginBtn').onclick = function() { showSection(loginSection); };
 
-            // 登录逻辑
             async function handleLogin() {
                 var email = document.getElementById('loginEmail').value.trim();
                 var password = document.getElementById('loginPassword').value.trim();
@@ -644,7 +667,6 @@
             var loginBtn = document.getElementById('loginBtn');
             loginBtn.onclick = handleLogin;
 
-            // 注册逻辑
             async function handleRegister() {
                 var name = document.getElementById('regName').value.trim();
                 var email = document.getElementById('regEmail').value.trim();
@@ -678,7 +700,6 @@
             var regBtn = document.getElementById('registerBtn');
             regBtn.onclick = handleRegister;
 
-            // 会话检查
             async function checkSession() {
                 try {
                     var sRes = await sbClient.auth.getSession();
@@ -708,7 +729,6 @@
             document.getElementById('logoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
             document.getElementById('adminLogoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
 
-            // 时钟
             setInterval(function() {
                 var now = new Date();
                 document.getElementById('liveClock').textContent = now.toTimeString().split(' ')[0];
@@ -870,27 +890,44 @@
                 }).join('');
             }
 
-            // 员工提交报销
+            // 员工提交报销（具备防重复提交锁与内容唯一性校验）
             document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
                 e.preventDefault();
                 var btn = document.getElementById('empSubmitReimburseBtn');
                 var tip = document.getElementById('empReimburseResult');
                 var name = document.getElementById('empApplicantName').value.trim();
                 var date = document.getElementById('empApplyDate').value;
-                var amount = document.getElementById('empReimburseAmount').value;
+                var amount = parseFloat(document.getElementById('empReimburseAmount').value);
                 var fileInput = document.getElementById('empReceiptFile');
 
                 if (!fileInput.files || fileInput.files.length === 0) { alert('请选择凭证！'); return; }
 
-                btn.disabled = true; btn.textContent = '上传中...';
+                // 防重复提交：如果正在提交中，直接拦截
+                if (btn.disabled) return;
+                btn.disabled = true; 
+                btn.textContent = '正在提交...';
+                tip.style.color = '#7c3aed'; 
+                tip.textContent = '⏳ 正在校验并上传报销申请...';
+
                 try {
+                    // 查询最近5分钟内是否已经提交过相同金额和日期的报销，避免瞬间重复点击
+                    var uRes = await sbClient.auth.getUser();
+                    var checkDup = await sbClient.from('reimbursements').select('*').eq('applicant_name', name).eq('apply_date', date).eq('amount', amount).limit(1);
+                    if (checkDup.data && checkDup.data.length > 0) {
+                        tip.style.color = '#dc2626'; 
+                        tip.textContent = '❌ 检测到相同日期与金额的报销记录已存在，请勿重复提交！';
+                        btn.disabled = false; 
+                        btn.textContent = '📤 提交报销申请';
+                        return;
+                    }
+
                     var file = fileInput.files[0];
                     var filePath = Date.now() + '_' + Math.random().toString(36).substring(7) + '.' + file.name.split('.').pop();
                     var upRes = await sbClient.storage.from('receipts').upload(filePath, file);
                     if (upRes.error) throw upRes.error;
                     var urlRes = sbClient.storage.from('receipts').getPublicUrl(filePath);
 
-                    var dbRes = await sbClient.from('reimbursements').insert([{ applicant_name: name, apply_date: date, amount: parseFloat(amount), receipt_url: urlRes.data.publicUrl, status: 'Pending' }]);
+                    var dbRes = await sbClient.from('reimbursements').insert([{ applicant_name: name, apply_date: date, amount: amount, receipt_url: urlRes.data.publicUrl, status: 'Pending' }]);
                     if (dbRes.error) throw dbRes.error;
 
                     tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！';
@@ -900,11 +937,12 @@
                 } catch (err) {
                     tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + err.message;
                 } finally {
-                    btn.disabled = false; btn.textContent = '📤 提交报销申请';
+                    // 提交完成后恢复按钮可用状态
+                    btn.disabled = false; 
+                    btn.textContent = '📤 提交报销申请';
                 }
             };
 
-            // 加载个人报销历史（已去掉美金符号，增加查看详情按钮）
             async function loadEmpReimburseHistory() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(10);
                 empReimbursementsCache = res.data || [];
@@ -921,13 +959,11 @@
                 }).join('');
             }
 
-            // 员工端查看报销详情弹窗逻辑
             window.viewReimburseDetail = function(idx) {
                 var item = empReimbursementsCache[idx];
                 if (!item) return;
                 document.getElementById('detailApplicant').textContent = item.applicant_name || '-';
                 document.getElementById('detailDate').textContent = item.apply_date || '-';
-                // 纯数值金额，不加美金符号
                 document.getElementById('detailAmount').textContent = item.amount;
                 
                 var statusCn = item.status==='Approved'?'✅ 已通过 / 已准许':item.status==='Rejected'?'❌ 已拒绝 / 未通过':'⏳ 正在审核中';
@@ -954,18 +990,52 @@
                 document.getElementById('reimburseDetailModal').style.display = 'none';
             };
 
-            // 请假
+            // 请假申请（具备防重复提交锁与同一时间段内容去重校验）
             document.getElementById('submitLeaveBtn').onclick = async function() {
+                var btn = document.getElementById('submitLeaveBtn');
                 var uRes = await sbClient.auth.getUser();
+                if (!uRes.data || !uRes.data.user) return;
+                
                 var type = document.getElementById('leaveType').value;
                 var start = document.getElementById('startDate').value;
                 var end = document.getElementById('endDate').value;
                 var reason = document.getElementById('leaveReason').value.trim();
                 var tip = document.getElementById('leaveResult');
+                
                 if (!start || !end) { alert('请选择起止日期！'); return; }
-                var res = await sbClient.from('leave_requests').insert([{ user_id: uRes.data.user.id, request_type: type, start_date: start + 'T00:00:00', end_date: end + 'T23:59:59', reason: reason || '无', status: '待审批' }]);
-                if (res.error) alert('提交失败: ' + res.error.message);
-                else { tip.style.color = '#10b981'; tip.textContent = '✅ 请假申请已提交！'; loadLeaveHistory(); }
+
+                // 按钮防重复加锁
+                if (btn.disabled) return;
+                btn.disabled = true;
+                btn.textContent = '正在提交申请...';
+                tip.style.color = '#2563eb';
+                tip.textContent = '⏳ 校验并提交中...';
+
+                try {
+                    // 云端查重：检查该用户是否存在相同起止日期且未被拒绝的请假记录，防止重复提交
+                    var dupCheck = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).eq('request_type', type).eq('start_date', start + 'T00:00:00').eq('end_date', end + 'T23:59:59');
+                    if (dupCheck.data && dupCheck.data.length > 0) {
+                        tip.style.color = '#dc2626';
+                        tip.textContent = '❌ 您已提交过相同时间段的同类型请假申请，请勿重复提交！';
+                        btn.disabled = false;
+                        btn.textContent = '提交请假申请';
+                        return;
+                    }
+
+                    var res = await sbClient.from('leave_requests').insert([{ user_id: uRes.data.user.id, request_type: type, start_date: start + 'T00:00:00', end_date: end + 'T23:59:59', reason: reason || '无', status: '待审批' }]);
+                    if (res.error) throw res.error;
+                    
+                    tip.style.color = '#10b981'; 
+                    tip.textContent = '✅ 请假申请已成功提交！';
+                    document.getElementById('leaveReason').value = '';
+                    loadLeaveHistory();
+                } catch(e) {
+                    tip.style.color = '#dc2626';
+                    tip.textContent = '提交失败: ' + e.message;
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '提交请假申请';
+                }
             };
 
             async function loadLeaveHistory() {
@@ -992,19 +1062,19 @@
 
             document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
 
-            // 管理员后台报销审批列表（去掉美金符号）
+            // 管理员后台报销审批列表
             async function loadAdminReimbursements() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
                 var data = res.data;
                 document.getElementById('adminReimburseList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="7">暂无记录</td></tr>' : data.map(function(i) {
                     var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
                     var statusCn = i.status==='Approved'?'已通过':i.status==='Rejected'?'已拒绝':'待处理';
-                    var preview = i.receipt_url ? '<a href="' + i.receipt_url + '" target="_blank"><img src="' + i.receipt_url + '" class="receipt-preview"/></a>' : '无';
+                    var preview = i.receipt_url ? '<img src="' + i.receipt_url + '" class="receipt-preview" onclick="openImagePreview(\'' + i.receipt_url + '\')" title="点击放大预览"/>' : '无';
                     var dis = i.status!=='Pending'?'disabled':'';
                     return '<tr>' +
                         '<td><strong>' + i.applicant_name + '</strong></td>' +
                         '<td>' + i.apply_date + '</td>' +
-                        '<td>' + i.amount + '</td>' + // 已去掉美金符号
+                        '<td>' + i.amount + '</td>' +
                         '<td>' + preview + '</td>' +
                         '<td><span class="badge-' + cls + '">' + statusCn + '</span></td>' +
                         '<td>' + (i.admin_remark || '-') + '</td>' +
@@ -1020,7 +1090,6 @@
                 loadAdminReimbursements();
             };
 
-            // 地图选点弹窗
             var mapInstance = null, markerInstance = null, tempLat = COMPANY_LOCATION.latitude, tempLng = COMPANY_LOCATION.longitude;
             document.getElementById('openMapPickerBtn').onclick = async function() {
                 await fetchCloudLocation();
