@@ -107,7 +107,7 @@
             transition: all 0.2s;
         }
         button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3); }
-        button:disabled { background: #cbd5e1 !important; cursor: not-allowed !important; box-shadow: none !important; transform: none !important; }
+        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed !important; box-shadow: none !important; transform: none !important; opacity: 0.7; }
 
         .switch-btn { background: transparent; color: var(--primary-color); margin-top: 10px; font-size: 14px; box-shadow: none; }
         .switch-btn:hover { background: #e0e7ff; transform: none; }
@@ -168,13 +168,12 @@
         th, td { border: 1px solid var(--border-color); padding: 10px 12px; text-align: left; }
         th { background: #f8fafc; color: var(--text-main); font-weight: 600; }
         
-        .badge-pending { color: #d97706; font-weight: bold; }
-        .badge-approved { color: #16a34a; font-weight: bold; }
-        .badge-rejected { color: #dc2626; font-weight: bold; }
+        .badge-pending { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 6px; border-radius: 4px; }
+        .badge-approved { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
+        .badge-rejected { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
         .badge-abnormal { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
         .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
         .badge-leave { color: #2563eb; font-weight: bold; background: #dbeafe; padding: 2px 6px; border-radius: 4px; }
-        .badge-manual { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 0; list-style: none; max-height: 180px; overflow-y: auto; margin: 0; }
         li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; }
@@ -183,8 +182,8 @@
         .holiday-banner { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 16px; display: none; }
         
         .action-btns button { width: auto; padding: 4px 10px; font-size: 12px; margin-right: 4px; box-shadow: none; }
-        .btn-success { background: #10b981; }
-        .btn-danger { background: #ef4444; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
         .btn-sm { width: auto; padding: 5px 12px; font-size: 12px; }
         
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
@@ -193,6 +192,8 @@
 
         .flex-row { display: flex; gap: 10px; }
         .flex-row .input-group { flex: 1; }
+
+        .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; }
 
         #mapModal {
             display: none;
@@ -276,7 +277,6 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <!-- 🎯 已去掉了 “250米内有效” 字样 -->
                 <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
@@ -294,6 +294,36 @@
                     <h4 style="font-size:14px; margin:0 0 10px 0;">🗓️ 今日考勤与打卡记录：</h4>
                     <ul id="historyList"><li>加载中...</li></ul>
                 </div>
+            </div>
+
+            <!-- 提交报销申请模块（新增） -->
+            <div class="card" style="border: 2px solid #8b5cf6;">
+                <h3 style="color:#7c3aed;">📝 提交报销申请</h3>
+                <form id="employeeReimburseForm" onsubmit="handleEmployeeReimburseSubmit(event)">
+                    <div class="input-group">
+                        <label>申请人姓名 *</label>
+                        <input type="text" id="empApplicantName" placeholder="例如：张三" required>
+                    </div>
+                    <div class="flex-row">
+                        <div class="input-group">
+                            <label>申请时间 *</label>
+                            <input type="date" id="empApplyDate" required>
+                        </div>
+                        <div class="input-group">
+                            <label>报销金额 ($ / ¥) *</label>
+                            <input type="number" step="0.01" id="empReimburseAmount" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>上传报销凭证 (发票/收据图片) *</label>
+                        <input type="file" id="empReceiptFile" accept="image/*" required>
+                    </div>
+                    <button type="submit" id="empSubmitReimburseBtn" style="background: #7c3aed;">📤 提交报销申请</button>
+                </form>
+                <p id="empReimburseResult" style="text-align:center; font-weight:600; margin-top:10px; font-size:13px;"></p>
+
+                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史报销记录：</h4>
+                <ul id="empReimburseHistoryList"><li>加载中...</li></ul>
             </div>
 
             <!-- 请假申请模块 -->
@@ -328,6 +358,30 @@
                     <span>👑 管理员系统控制台</span>
                 </div>
                 <button class="logout-btn" id="adminLogoutBtn" type="button">退出</button>
+            </div>
+
+            <!-- 报销审批控制台（新增） -->
+            <div class="card" style="border: 2px solid #7c3aed;">
+                <h3>
+                    <span style="color:#7c3aed;">📋 报销申请审批控制台</span>
+                    <button id="refreshReimburseBtn" type="button" class="btn-sm" style="background: #7c3aed; color:white;">🔄 刷新报销列表</button>
+                </h3>
+                <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>申请人</th>
+                                <th>时间</th>
+                                <th>金额</th>
+                                <th>凭证</th>
+                                <th>状态</th>
+                                <th>备注</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminReimburseList"><tr><td colspan="7">加载中...</td></tr></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- 地图选点修改定位配置面板 -->
@@ -504,6 +558,9 @@
 
                 const startDateInput = document.getElementById('startDate');
                 const endDateInput = document.getElementById('endDate');
+                const empApplyDateInput = document.getElementById('empApplyDate');
+
+                if (empApplyDateInput) empApplyDateInput.value = todayStr;
 
                 if (startDateInput) {
                     startDateInput.min = todayStr;
@@ -599,6 +656,8 @@
                         showSection(dashboardSection);
                         const welcomeEl = document.getElementById('welcomeUser');
                         if (welcomeEl) welcomeEl.textContent = `👋 欢迎，${profile.full_name}`;
+                        const nameInput = document.getElementById('empApplicantName');
+                        if (nameInput) nameInput.value = profile.full_name;
                         loadEmployeeData();
                     }
                 } catch (err) {}
@@ -693,6 +752,8 @@
                             showSection(dashboardSection);
                             const welcomeEl = document.getElementById('welcomeUser');
                             if (welcomeEl) welcomeEl.textContent = `👋 欢迎，${profile.full_name}`;
+                            const nameInput = document.getElementById('empApplicantName');
+                            if (nameInput) nameInput.value = profile.full_name;
                             loadEmployeeData();
                         }
                     } catch (e) {
@@ -709,7 +770,13 @@
             const adminLogoutBtn = document.getElementById('adminLogoutBtn');
             if (adminLogoutBtn) adminLogoutBtn.onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
 
-            function loadEmployeeData() { loadAnnouncements(); checkHolidayAndAttendance(); loadHistory(); loadLeaveHistory(); }
+            function loadEmployeeData() { 
+                loadAnnouncements(); 
+                checkHolidayAndAttendance(); 
+                loadHistory(); 
+                loadLeaveHistory(); 
+                loadEmpReimburseHistory();
+            }
 
             async function loadAnnouncements() {
                 const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
@@ -808,7 +875,7 @@
                     await fetchCloudLocation();
 
                     AMap.plugin('AMap.Geolocation', function() {
-                        const geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 10000, convert: true });
+                        const geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 15000, convert: true });
                         geolocation.getCurrentPosition(async function(status, result) {
                             if (status === 'complete') {
                                 const distance = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
@@ -912,6 +979,85 @@
                         return `<li><span style="${colorStyle}">${icon} ${displayLabel}</span><span style="color:#64748b;">${timeStr}</span></li>`;
                     }).join('');
                 }
+            }
+
+            // --- 员工端报销提交逻辑 ---
+            window.handleEmployeeReimburseSubmit = async function(e) {
+                e.preventDefault();
+                const btn = document.getElementById('empSubmitReimburseBtn');
+                const resultTip = document.getElementById('empReimburseResult');
+
+                const name = document.getElementById('empApplicantName').value.trim();
+                const date = document.getElementById('empApplyDate').value;
+                const amount = document.getElementById('empReimburseAmount').value;
+                const fileInput = document.getElementById('empReceiptFile');
+
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert('请选择需要上传的发票/凭证图片！');
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = '正在上传凭证并提交...';
+                if (resultTip) { resultTip.style.color = '#2563eb'; resultTip.textContent = '图片上传中...'; }
+
+                try {
+                    const file = fileInput.files[0];
+                    const fileExt = file.name.split('.').pop();
+                    const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                    // 上传至 Supabase Storage
+                    const { error: uploadError } = await sbClient.storage
+                        .from('receipts')
+                        .upload(filePath, file);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: urlData } = sbClient.storage.from('receipts').getPublicUrl(filePath);
+                    const receiptUrl = urlData.publicUrl;
+
+                    // 写入报销表
+                    const { error: dbError } = await sbClient.from('reimbursements').insert([{
+                        applicant_name: name,
+                        apply_date: date,
+                        amount: parseFloat(amount),
+                        receipt_url: receiptUrl,
+                        status: 'Pending'
+                    }]);
+
+                    if (dbError) throw dbError;
+
+                    if (resultTip) { resultTip.style.color = '#10b981'; resultTip.textContent = '🎉 报销申请提交成功！请等待财务/管理员审批。'; }
+                    document.getElementById('empReimburseForm').reset();
+                    setupLeaveDateConstraints();
+                    loadEmpReimburseHistory();
+
+                } catch (err) {
+                    if (resultTip) { resultTip.style.color = '#dc2626'; resultTip.textContent = '提交失败: ' + err.message; }
+                    alert('提交失败: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '📤 提交报销申请';
+                }
+            };
+
+            async function loadEmpReimburseHistory() {
+                const nameInput = document.getElementById('empApplicantName');
+                const name = nameInput ? nameInput.value.trim() : '';
+                const historyEl = document.getElementById('empReimburseHistoryList');
+                if (!historyEl) return;
+
+                const { data } = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(5);
+                if (!data || data.length === 0) {
+                    historyEl.innerHTML = '<li>暂无报销提交记录</li>';
+                    return;
+                }
+
+                historyEl.innerHTML = data.map(i => {
+                    const statusClass = i.status === 'Approved' ? 'approved' : i.status === 'Rejected' ? 'rejected' : 'pending';
+                    const statusText = i.status === 'Approved' ? '已批准' : i.status === 'Rejected' ? '已拒绝' : '待审批';
+                    return `<li><span>🧾 [${i.apply_date}] 金额: $${parseFloat(i.amount).toFixed(2)}</span><span class="badge-${statusClass}">${statusText}</span></li>`;
+                }).join('');
             }
 
             let mapInstance = null;
@@ -1034,17 +1180,90 @@
                 }
             }
 
-            function loadAdminData() { loadAdminUsers(); loadAdminLeaves(); loadAdminAttendance(); loadAdminAnnouncements(); analyzeAttendanceData(); populateManualUserSelect(); }
+            function loadAdminData() { 
+                loadAdminUsers(); 
+                loadAdminLeaves(); 
+                loadAdminAttendance(); 
+                loadAdminAnnouncements(); 
+                analyzeAttendanceData(); 
+                populateManualUserSelect(); 
+                loadAdminReimbursements();
+            }
 
-            // 后台自动静默轮询更新间隔设置为每两小时一次 (2小时 = 7200000毫秒)
             function startAdminAutoRefresh() {
                 setInterval(() => {
                     loadAdminUsers();
                     loadAdminLeaves();
                     loadAdminAttendance();
                     analyzeAttendanceData();
+                    loadAdminReimbursements();
                 }, 2 * 60 * 60 * 1000);
             }
+
+            // --- 管理员端报销列表加载与审批逻辑 ---
+            const refreshReimburseBtn = document.getElementById('refreshReimburseBtn');
+            if (refreshReimburseBtn) refreshReimburseBtn.onclick = () => { loadAdminReimbursements(); alert('报销列表已刷新！'); };
+
+            async function loadAdminReimbursements() {
+                const tbody = document.getElementById('adminReimburseList');
+                if (!tbody) return;
+                tbody.innerHTML = '<tr><td colspan="7">加载中...</td></tr>';
+
+                const { data, error } = await sbClient
+                    .from('reimbursements')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error || !data) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:red;">加载失败: ${error?.message || '未知错误'}</td></tr>`;
+                    return;
+                }
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7">暂无报销申请记录。</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => {
+                    const isPending = item.status === 'Pending';
+                    const statusClass = item.status === 'Approved' ? 'approved' : item.status === 'Rejected' ? 'rejected' : 'pending';
+                    const statusText = item.status === 'Approved' ? '已批准' : item.status === 'Rejected' ? '已拒绝' : '待审批';
+
+                    return `
+                        <tr>
+                            <td><strong>${item.applicant_name}</strong></td>
+                            <td>${item.apply_date}</td>
+                            <td style="font-weight:bold; color:#0f172a;">$${parseFloat(item.amount).toFixed(2)}</td>
+                            <td>
+                                ${item.receipt_url 
+                                    ? `<a href="${item.receipt_url}" target="_blank"><img src="${item.receipt_url}" class="receipt-preview" title="点击查看发票原图"/></a>` 
+                                    : '无凭证'}
+                            </td>
+                            <td><span class="badge-${statusClass}">${statusText}</span></td>
+                            <td>${item.admin_remark || '-'}</td>
+                            <td class="action-btns">
+                                <button class="btn-success" ${!isPending ? 'disabled' : ''} onclick="reviewReimbursement('${item.id}', 'Approved')">同意</button>
+                                <button class="btn-danger" ${!isPending ? 'disabled' : ''} onclick="reviewReimbursement('${item.id}', 'Rejected')">拒绝</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            window.reviewReimbursement = async (id, newStatus) => {
+                const remark = prompt(`请输入${newStatus === 'Approved' ? '同意' : '拒绝'}的审批备注/批复 (可选):`);
+                if (remark === null) return;
+
+                const { error } = await sbClient.from('reimbursements')
+                    .update({ status: newStatus, admin_remark: remark })
+                    .eq('id', id);
+
+                if (error) {
+                    alert('更新状态失败: ' + error.message);
+                } else {
+                    loadAdminReimbursements();
+                }
+            };
 
             async function populateManualUserSelect() {
                 const { data: profiles } = await sbClient.from('profiles').select('*');
