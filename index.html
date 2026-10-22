@@ -333,7 +333,7 @@
             </div>
         </div>
 
-        <!-- 管理员控制台（完整恢复所有模块） -->
+        <!-- 管理员控制台（完整包含所有模块） -->
         <div id="adminSection" style="display: none;">
             <div class="welcome-bar" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #3730a3;">
                 <div class="brand-header-flex">
@@ -380,3 +380,378 @@
                         <input type="text" id="displayLng" value="120.783677" readonly>
                     </div>
                 </div>
+                <button id="openMapPickerBtn" type="button" style="background: #2563eb;">📍 开启地图选点 (类似微信发送位置)</button>
+            </div>
+
+            <!-- 3. 管理员补卡功能 -->
+            <div class="card" style="border: 2px solid #f59e0b;">
+                <h3 style="color:#d97706;">🛠️ 管理员手动补卡 / 异常纠偏</h3>
+                <div class="flex-row">
+                    <div class="input-group">
+                        <label>选择员工</label>
+                        <select id="manualUserSelect"><option value="">加载员工中...</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>补卡类型</label>
+                        <select id="manualClockType">
+                            <option value="补卡(上班)">🟢 补卡 - 上班记录</option>
+                            <option value="补卡(下班)">🔴 补卡 - 下班记录</option>
+                            <option value="补卡(外勤/特殊)">🛠️ 补卡 - 外勤/特殊记录</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>实际打卡时间</label>
+                    <input type="datetime-local" id="manualClockTime">
+                </div>
+                <div class="input-group">
+                    <label>补卡原因说明（必填）</label>
+                    <input type="text" id="manualReason" placeholder="例如：员工外勤手机无法定位，管理员补卡">
+                </div>
+                <button id="submitManualClockBtn" type="button" style="background: #f59e0b;">💾 提交补充打卡记录</button>
+            </div>
+
+            <!-- 4. 智能考勤分析 -->
+            <div class="card" style="border: 2px solid #10b981;">
+                <h3>
+                    <span>📈 智能考勤分析与统计</span>
+                    <button id="analyzeAttendanceBtn" type="button" class="btn-sm" style="background: #10b981;">📊 手动刷新分析</button>
+                </h3>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">总打卡/考勤人次</div>
+                        <div id="statTotal" class="stat-num">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">正常打卡 / 准假</div>
+                        <div id="statNormal" class="stat-num" style="color: #16a34a;">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div style="font-size: 12px; color: var(--text-secondary);">补卡/异常</div>
+                        <div id="statLate" class="stat-num" style="color: #dc2626;">0</div>
+                    </div>
+                </div>
+                <div style="overflow-x: auto; max-height: 220px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>员工姓名</th><th>考勤类型</th><th>时间 / 备注</th><th>状态识别</th></tr>
+                        </thead>
+                        <tbody id="adminAttendanceAnalysisList"><tr><td colspan="4">加载分析中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5. 全公司打卡动态监控 -->
+            <div class="card" style="border: 2px solid #3b82f6;">
+                <h3>
+                    <span>⚡ 全公司考勤打卡实时监控</span>
+                    <button id="refreshAttendanceBtn" type="button" class="btn-sm" style="background: #2563eb;">🔄 刷新数据列表</button>
+                </h3>
+                <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>员工姓名</th><th>打卡类型</th><th>记录时间与情况</th></tr>
+                        </thead>
+                        <tbody id="adminAttendanceList"><tr><td colspan="3">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 6. 发布通知 -->
+            <div class="card">
+                <h3>📢 发布公司通知 (自动记录发布时间)</h3>
+                <div class="input-group"><input type="text" id="announcementTitleInput" placeholder="通知标题"></div>
+                <div class="input-group"><textarea id="announcementContentInput" placeholder="详细内容..." rows="2"></textarea></div>
+                <button id="publishAnnouncementBtn" type="button" style="background: #f59e0b;">📤 立即发布</button>
+                <div style="margin-top:12px; max-height: 150px; overflow-y: auto;">
+                    <table>
+                        <thead><tr><th>标题、内容与发布时间</th><th>操作</th></tr></thead>
+                        <tbody id="adminAnnouncementList"><tr><td colspan="2">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 7. 注册与请假审核 -->
+            <div class="card">
+                <h3>👥 员工注册审核</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead><tr><th>姓名</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody id="adminUserList"><tr><td colspan="4">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📋 员工请假审批</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead><tr><th>姓名(类型)</th><th>起止日期</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody id="adminLeaveList"><tr><td colspan="5">加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 8. 导出报表 -->
+            <div class="card">
+                <h3>📊 导出考勤报表</h3>
+                <button id="exportExcelBtn" type="button" style="background: #059669;">📥 导出全员考勤明细及月度统计 Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 高德地图选点弹窗 -->
+    <div id="mapModal">
+        <div class="map-modal-content">
+            <h3 style="margin:0 0 10px 0; border:none; padding:0;">📍 请在地图上点击选择公司打卡位置</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">点击地图任意位置锁定坐标。</p>
+            <div id="amapContainer"></div>
+            <div id="selectedAddrTip" style="font-size: 13px; font-weight: 600; color: #2563eb; margin-bottom: 12px;">已选坐标：暂未选择</div>
+            <div class="flex-row">
+                <button id="confirmMapBtn" type="button" style="background: #10b981;">✅ 确认使用此坐标并同步云端</button>
+                <button id="closeMapBtn" type="button" style="background: #64748b;">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 Supabase SDK 和高德地图 JS API -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
+
+            const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: { persistSession: true, autoRefreshToken: true }
+            });
+
+            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
+
+            const loginSection = document.getElementById('loginSection');
+            const registerSection = document.getElementById('registerSection');
+            const pendingSection = document.getElementById('pendingSection');
+            const dashboardSection = document.getElementById('dashboardSection');
+            const adminSection = document.getElementById('adminSection');
+
+            let currentClockState = 'in';
+
+            function showSection(section) {
+                if(loginSection) loginSection.style.display = 'none';
+                if(registerSection) registerSection.style.display = 'none';
+                if(pendingSection) pendingSection.style.display = 'none';
+                if(dashboardSection) dashboardSection.style.display = 'none';
+                if(adminSection) adminSection.style.display = 'none';
+                if(section) section.style.display = 'block';
+            }
+
+            document.getElementById('toRegisterBtn').onclick = () => showSection(registerSection);
+            document.getElementById('toLoginBtn').onclick = () => showSection(loginSection);
+            document.getElementById('backToLoginBtn').onclick = () => showSection(loginSection);
+
+            // 登录逻辑
+            async function handleLogin() {
+                const email = document.getElementById('loginEmail').value.trim();
+                const password = document.getElementById('loginPassword').value.trim();
+                const btn = document.getElementById('loginBtn');
+
+                if (!email || !password) { alert('请输入邮箱和密码！'); return; }
+
+                btn.disabled = true;
+                btn.textContent = '登录中...';
+
+                try {
+                    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+                    if (error) { alert('登录失败: ' + error.message); return; }
+
+                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+                    if (!profile) {
+                        const { data: newP } = await sbClient.from('profiles').insert([{ id: data.user.id, full_name: email, is_approved: false, status: '待审核', role: 'employee' }]).select().single();
+                        profile = newP || { role: 'employee', is_approved: false };
+                    }
+
+                    if (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin') {
+                        showSection(pendingSection);
+                        return;
+                    }
+
+                    if (profile.role === 'admin') {
+                        showSection(adminSection);
+                        loadAdminData();
+                    } else {
+                        showSection(dashboardSection);
+                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name || email}`;
+                        document.getElementById('empApplicantName').value = profile.full_name || '';
+                        loadEmployeeData();
+                    }
+                } catch (err) {
+                    alert('登录异常: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '登录系统';
+                }
+            }
+
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.onclick = handleLogin;
+            loginBtn.ontouchend = (e) => { e.preventDefault(); handleLogin(); };
+
+            // 注册逻辑
+            async function handleRegister() {
+                const name = document.getElementById('regName').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const password = document.getElementById('regPassword').value.trim();
+                const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+                const btn = document.getElementById('registerBtn');
+
+                if (!name || !email || !password) { alert('请完整填写基本信息！'); return; }
+                if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
+                if (password.length < 6) { alert('密码至少 6 位！'); return; }
+
+                btn.disabled = true;
+                btn.textContent = '提交中...';
+
+                try {
+                    const { data, error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
+                    if (error) { alert('注册失败: ' + error.message); return; }
+
+                    if (data && data.user) {
+                        await sbClient.from('profiles').upsert([{ id: data.user.id, full_name: name, is_approved: false, status: '待审核', role: 'employee' }]);
+                    }
+                    alert('🎉 注册成功！请等待管理员审批。');
+                    showSection(pendingSection);
+                } catch (e) {
+                    alert('注册异常: ' + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = '提交注册申请';
+                }
+            }
+            const regBtn = document.getElementById('registerBtn');
+            regBtn.onclick = handleRegister;
+            regBtn.ontouchend = (e) => { e.preventDefault(); handleRegister(); };
+
+            // 会话检查
+            async function checkSession() {
+                try {
+                    const { data: { session } } = await sbClient.auth.getSession();
+                    if (!session || !session.user) { showSection(loginSection); return; }
+                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                    if (!profile || (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin')) {
+                        showSection(pendingSection);
+                        return;
+                    }
+                    if (profile.role === 'admin') {
+                        showSection(adminSection);
+                        loadAdminData();
+                    } else {
+                        showSection(dashboardSection);
+                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name}`;
+                        document.getElementById('empApplicantName').value = profile.full_name || '';
+                        loadEmployeeData();
+                    }
+                } catch (e) {
+                    showSection(loginSection);
+                }
+            }
+            checkSession();
+
+            document.getElementById('logoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
+            document.getElementById('adminLogoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
+
+            // 时钟
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('liveClock').textContent = now.toTimeString().split(' ')[0];
+                document.getElementById('liveDate').textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            }, 1000);
+
+            function setupLeaveDateConstraints() {
+                const today = new Date().toISOString().slice(0,10);
+                const s = document.getElementById('startDate');
+                const e = document.getElementById('endDate');
+                const a = document.getElementById('empApplyDate');
+                if(a) a.value = today;
+                if(s) { s.min = today; s.onchange = () => { if(e) e.min = s.value; }; }
+                if(e) e.min = today;
+            }
+            setupLeaveDateConstraints();
+
+            async function fetchCloudLocation() {
+                try {
+                    const { data } = await sbClient.from('announcements').select('*').eq('title', '__SYS_LOCATION__').maybeSingle();
+                    if (data && data.content) {
+                        const parts = data.content.split(',');
+                        if (parts.length === 2) {
+                            COMPANY_LOCATION.latitude = parseFloat(parts[0]);
+                            COMPANY_LOCATION.longitude = parseFloat(parts[1]);
+                            document.getElementById('displayLat').value = COMPANY_LOCATION.latitude.toFixed(6);
+                            document.getElementById('displayLng').value = COMPANY_LOCATION.longitude.toFixed(6);
+                        }
+                    }
+                } catch(e) {}
+            }
+            fetchCloudLocation();
+
+            function loadEmployeeData() {
+                loadAnnouncements();
+                checkHolidayAndAttendance();
+                loadHistory();
+                loadLeaveHistory();
+                loadEmpReimburseHistory();
+            }
+
+            async function loadAnnouncements() {
+                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
+                document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`).join('');
+            }
+
+            async function checkHolidayAndAttendance() {
+                const now = new Date();
+                const todayStr = now.toISOString().slice(0,10);
+                let isHoliday = (now.getDay() === 0 || now.getDay() === 6);
+                const banner = document.getElementById('holidayBanner');
+                const btn = document.getElementById('clockBtn');
+                if (isHoliday) {
+                    banner.style.display = 'block';
+                    btn.className = 'clock-circle-btn btn-done';
+                    btn.disabled = true;
+                    return;
+                }
+                banner.style.display = 'none';
+
+                const { data: { user } } = await sbClient.auth.getUser();
+                if (!user) return;
+                const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', `${todayStr}T00:00:00`);
+                const hasIn = records?.some(r => r.clock_type.includes('上班') || r.clock_type === 'in');
+                const hasOut = records?.some(r => r.clock_type.includes('下班') || r.clock_type === 'out');
+                const tip = document.getElementById('clockResult');
+
+                if (!hasIn) {
+                    currentClockState = 'in';
+                    btn.className = 'clock-circle-btn btn-in';
+                    document.getElementById('clockBtnMainText').textContent = '上班打卡';
+                    document.getElementById('clockBtnSubText').textContent = '09:00 前';
+                    btn.disabled = false;
+                } else if (!hasOut) {
+                    currentClockState = 'out';
+                    btn.className = 'clock-circle-btn btn-out';
+                    document.getElementById('clockBtnMainText').textContent = '下班打卡';
+                    document.getElementById('clockBtnSubText').textContent = '18:00 后';
+                    btn.disabled = false;
+                    tip.style.color = '#10b981'; tip.textContent = '✅ 已完成上班打卡';
+                } else {
+                    btn.className = 'clock-circle-btn btn-done';
+                    document.getElementById('clockBtnMainText').textContent = '已打卡';
+                    document.getElementById('clockBtnSubText').textContent = '考勤完成';
+                    btn.disabled = true;
+                    tip.style.color = '#10b981'; tip.textContent = '🎉 今日考勤已全部完成！';
+                }
+            }
+
+            function calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371000;
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 *
