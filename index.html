@@ -6,8 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
     <title>企业员工自助服务与管理系统</title>
+    <!-- 全局捕获页面未捕获的报错 -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            alert("⚠️ 页面JS执行异常:\n" + msg + "\n行号: " + line);
+            return false;
+        };
+    </script>
     <!-- 引入 SheetJS 用于导出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 引入 Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- 引入高德地图 JS API -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
+    
     <style>
         :root {
             --primary-color: #3b82f6;
@@ -333,7 +345,7 @@
             </div>
         </div>
 
-        <!-- 管理员控制台（完整包含所有模块） -->
+        <!-- 管理员控制台 -->
         <div id="adminSection" style="display: none;">
             <div class="welcome-bar" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #3730a3;">
                 <div class="brand-header-flex">
@@ -514,28 +526,30 @@
         </div>
     </div>
 
-    <!-- 引入 Supabase SDK 和高德地图 JS API -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
-    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
 
-            const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: { persistSession: true, autoRefreshToken: true }
-            });
+            var sbClient;
+            try {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { persistSession: true, autoRefreshToken: true }
+                });
+            } catch (err) {
+                alert("Supabase客户端初始化错误: " + err.message);
+                return;
+            }
 
-            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
+            var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
 
-            const loginSection = document.getElementById('loginSection');
-            const registerSection = document.getElementById('registerSection');
-            const pendingSection = document.getElementById('pendingSection');
-            const dashboardSection = document.getElementById('dashboardSection');
-            const adminSection = document.getElementById('adminSection');
+            var loginSection = document.getElementById('loginSection');
+            var registerSection = document.getElementById('registerSection');
+            var pendingSection = document.getElementById('pendingSection');
+            var dashboardSection = document.getElementById('dashboardSection');
+            var adminSection = document.getElementById('adminSection');
 
-            let currentClockState = 'in';
+            var currentClockState = 'in';
 
             function showSection(section) {
                 if(loginSection) loginSection.style.display = 'none';
@@ -546,15 +560,15 @@
                 if(section) section.style.display = 'block';
             }
 
-            document.getElementById('toRegisterBtn').onclick = () => showSection(registerSection);
-            document.getElementById('toLoginBtn').onclick = () => showSection(loginSection);
-            document.getElementById('backToLoginBtn').onclick = () => showSection(loginSection);
+            document.getElementById('toRegisterBtn').onclick = function() { showSection(registerSection); };
+            document.getElementById('toLoginBtn').onclick = function() { showSection(loginSection); };
+            document.getElementById('backToLoginBtn').onclick = function() { showSection(loginSection); };
 
             // 登录逻辑
             async function handleLogin() {
-                const email = document.getElementById('loginEmail').value.trim();
-                const password = document.getElementById('loginPassword').value.trim();
-                const btn = document.getElementById('loginBtn');
+                var email = document.getElementById('loginEmail').value.trim();
+                var password = document.getElementById('loginPassword').value.trim();
+                var btn = document.getElementById('loginBtn');
 
                 if (!email || !password) { alert('请输入邮箱和密码！'); return; }
 
@@ -562,13 +576,15 @@
                 btn.textContent = '登录中...';
 
                 try {
-                    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-                    if (error) { alert('登录失败: ' + error.message); return; }
+                    var res = await sbClient.auth.signInWithPassword({ email: email, password: password });
+                    if (res.error) { alert('登录失败: ' + res.error.message); return; }
 
-                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+                    var pRes = await sbClient.from('profiles').select('*').eq('id', res.data.user.id).maybeSingle();
+                    var profile = pRes.data;
+
                     if (!profile) {
-                        const { data: newP } = await sbClient.from('profiles').insert([{ id: data.user.id, full_name: email, is_approved: false, status: '待审核', role: 'employee' }]).select().single();
-                        profile = newP || { role: 'employee', is_approved: false };
+                        var newP = await sbClient.from('profiles').insert([{ id: res.data.user.id, full_name: email, is_approved: false, status: '待审核', role: 'employee' }]).select().single();
+                        profile = newP.data || { role: 'employee', is_approved: false };
                     }
 
                     if (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin') {
@@ -581,29 +597,28 @@
                         loadAdminData();
                     } else {
                         showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name || email}`;
+                        document.getElementById('welcomeUser').textContent = '👋 欢迎，' + (profile.full_name || email);
                         document.getElementById('empApplicantName').value = profile.full_name || '';
                         loadEmployeeData();
                     }
                 } catch (err) {
-                    alert('登录异常: ' + err.message);
+                    alert('登录异常: ' + (err.message || err));
                 } finally {
                     btn.disabled = false;
                     btn.textContent = '登录系统';
                 }
             }
 
-            const loginBtn = document.getElementById('loginBtn');
+            var loginBtn = document.getElementById('loginBtn');
             loginBtn.onclick = handleLogin;
-            loginBtn.ontouchend = (e) => { e.preventDefault(); handleLogin(); };
 
             // 注册逻辑
             async function handleRegister() {
-                const name = document.getElementById('regName').value.trim();
-                const email = document.getElementById('regEmail').value.trim();
-                const password = document.getElementById('regPassword').value.trim();
-                const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
-                const btn = document.getElementById('registerBtn');
+                var name = document.getElementById('regName').value.trim();
+                var email = document.getElementById('regEmail').value.trim();
+                var password = document.getElementById('regPassword').value.trim();
+                var confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+                var btn = document.getElementById('registerBtn');
 
                 if (!name || !email || !password) { alert('请完整填写基本信息！'); return; }
                 if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
@@ -613,11 +628,11 @@
                 btn.textContent = '提交中...';
 
                 try {
-                    const { data, error } = await sbClient.auth.signUp({ email, password, options: { data: { full_name: name } } });
-                    if (error) { alert('注册失败: ' + error.message); return; }
+                    var res = await sbClient.auth.signUp({ email: email, password: password, options: { data: { full_name: name } } });
+                    if (res.error) { alert('注册失败: ' + res.error.message); return; }
 
-                    if (data && data.user) {
-                        await sbClient.from('profiles').upsert([{ id: data.user.id, full_name: name, is_approved: false, status: '待审核', role: 'employee' }]);
+                    if (res.data && res.data.user) {
+                        await sbClient.from('profiles').upsert([{ id: res.data.user.id, full_name: name, is_approved: false, status: '待审核', role: 'employee' }]);
                     }
                     alert('🎉 注册成功！请等待管理员审批。');
                     showSection(pendingSection);
@@ -628,16 +643,17 @@
                     btn.textContent = '提交注册申请';
                 }
             }
-            const regBtn = document.getElementById('registerBtn');
+            var regBtn = document.getElementById('registerBtn');
             regBtn.onclick = handleRegister;
-            regBtn.ontouchend = (e) => { e.preventDefault(); handleRegister(); };
 
             // 会话检查
             async function checkSession() {
                 try {
-                    const { data: { session } } = await sbClient.auth.getSession();
-                    if (!session || !session.user) { showSection(loginSection); return; }
-                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                    var sRes = await sbClient.auth.getSession();
+                    if (!sRes.data || !sRes.data.session || !sRes.data.session.user) { showSection(loginSection); return; }
+                    var pRes = await sbClient.from('profiles').select('*').eq('id', sRes.data.session.user.id).maybeSingle();
+                    var profile = pRes.data;
+
                     if (!profile || (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin')) {
                         showSection(pendingSection);
                         return;
@@ -647,7 +663,7 @@
                         loadAdminData();
                     } else {
                         showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name}`;
+                        document.getElementById('welcomeUser').textContent = '👋 欢迎，' + profile.full_name;
                         document.getElementById('empApplicantName').value = profile.full_name || '';
                         loadEmployeeData();
                     }
@@ -657,32 +673,32 @@
             }
             checkSession();
 
-            document.getElementById('logoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
-            document.getElementById('adminLogoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
+            document.getElementById('logoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
+            document.getElementById('adminLogoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
 
             // 时钟
-            setInterval(() => {
-                const now = new Date();
+            setInterval(function() {
+                var now = new Date();
                 document.getElementById('liveClock').textContent = now.toTimeString().split(' ')[0];
                 document.getElementById('liveDate').textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             }, 1000);
 
             function setupLeaveDateConstraints() {
-                const today = new Date().toISOString().slice(0,10);
-                const s = document.getElementById('startDate');
-                const e = document.getElementById('endDate');
-                const a = document.getElementById('empApplyDate');
+                var today = new Date().toISOString().slice(0,10);
+                var s = document.getElementById('startDate');
+                var e = document.getElementById('endDate');
+                var a = document.getElementById('empApplyDate');
                 if(a) a.value = today;
-                if(s) { s.min = today; s.onchange = () => { if(e) e.min = s.value; }; }
+                if(s) { s.min = today; s.onchange = function() { if(e) e.min = s.value; }; }
                 if(e) e.min = today;
             }
             setupLeaveDateConstraints();
 
             async function fetchCloudLocation() {
                 try {
-                    const { data } = await sbClient.from('announcements').select('*').eq('title', '__SYS_LOCATION__').maybeSingle();
-                    if (data && data.content) {
-                        const parts = data.content.split(',');
+                    var res = await sbClient.from('announcements').select('*').eq('title', '__SYS_LOCATION__').maybeSingle();
+                    if (res.data && res.data.content) {
+                        var parts = res.data.content.split(',');
                         if (parts.length === 2) {
                             COMPANY_LOCATION.latitude = parseFloat(parts[0]);
                             COMPANY_LOCATION.longitude = parseFloat(parts[1]);
@@ -703,16 +719,19 @@
             }
 
             async function loadAnnouncements() {
-                const { data } = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
-                document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(i => `<div class="announcement-item"><strong>${i.title}</strong><br><span style="font-size:13px; color:#475569;">${i.content}</span></div>`).join('');
+                var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
+                var data = res.data;
+                document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(function(i) {
+                    return '<div class="announcement-item"><strong>' + i.title + '</strong><br><span style="font-size:13px; color:#475569;">' + i.content + '</span></div>';
+                }).join('');
             }
 
             async function checkHolidayAndAttendance() {
-                const now = new Date();
-                const todayStr = now.toISOString().slice(0,10);
-                let isHoliday = (now.getDay() === 0 || now.getDay() === 6);
-                const banner = document.getElementById('holidayBanner');
-                const btn = document.getElementById('clockBtn');
+                var now = new Date();
+                var todayStr = now.toISOString().slice(0,10);
+                var isHoliday = (now.getDay() === 0 || now.getDay() === 6);
+                var banner = document.getElementById('holidayBanner');
+                var btn = document.getElementById('clockBtn');
                 if (isHoliday) {
                     banner.style.display = 'block';
                     btn.className = 'clock-circle-btn btn-done';
@@ -721,12 +740,13 @@
                 }
                 banner.style.display = 'none';
 
-                const { data: { user } } = await sbClient.auth.getUser();
-                if (!user) return;
-                const { data: records } = await sbClient.from('attendance').select('*').eq('user_id', user.id).gte('clock_in_time', `${todayStr}T00:00:00`);
-                const hasIn = records?.some(r => r.clock_type.includes('上班') || r.clock_type === 'in');
-                const hasOut = records?.some(r => r.clock_type.includes('下班') || r.clock_type === 'out');
-                const tip = document.getElementById('clockResult');
+                var uRes = await sbClient.auth.getUser();
+                if (!uRes.data || !uRes.data.user) return;
+                var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).gte('clock_in_time', todayStr + 'T00:00:00');
+                var records = res.data;
+                var hasIn = records && records.some(function(r) { return r.clock_type.indexOf('上班') !== -1 || r.clock_type === 'in'; });
+                var hasOut = records && records.some(function(r) { return r.clock_type.indexOf('下班') !== -1 || r.clock_type === 'out'; });
+                var tip = document.getElementById('clockResult');
 
                 if (!hasIn) {
                     currentClockState = 'in';
@@ -751,7 +771,322 @@
             }
 
             function calculateDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371000;
-                const dLat = (lat2 - lat1) * Math.PI / 180;
-                const dLon = (lon2 - lon1) * Math.PI / 180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 *
+                var R = 6371000;
+                var dLat = (lat2 - lat1) * Math.PI / 180;
+                var dLon = (lon2 - lon1) * Math.PI / 180;
+                var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2)*Math.sin(dLon/2);
+                return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+            }
+
+            document.getElementById('clockBtn').onclick = async function() {
+                var tip = document.getElementById('clockResult');
+                tip.style.color = '#2563eb'; tip.textContent = '📍 获取高德定位中...';
+                await fetchCloudLocation();
+
+                if (!window.AMap) { alert("高德地图接口加载失败，请刷新！"); return; }
+
+                AMap.plugin('AMap.Geolocation', function() {
+                    var geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 15000 });
+                    geolocation.getCurrentPosition(async function(status, result) {
+                        if (status === 'complete') {
+                            var dist = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
+                            if (dist > COMPANY_LOCATION.maxDistance) {
+                                tip.style.color = '#dc2626';
+                                tip.textContent = '❌ 距离打卡点 ' + Math.round(dist) + '米 (超出550米限制)';
+                                alert('不在打卡范围内！当前距离 ' + Math.round(dist) + '米');
+                                return;
+                            }
+                            var now = new Date();
+                            var statusTag = (currentClockState === 'in' && (now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0))) ? '异常(迟到)' : '正常';
+                            var label = currentClockState === 'in' ? ('上班打卡 [' + statusTag + ']') : ('下班打卡 [' + statusTag + ']');
+                            var uRes = await sbClient.auth.getUser();
+                            await sbClient.from('attendance').insert([{ user_id: uRes.data.user.id, clock_type: label }]);
+                            tip.style.color = '#10b981'; tip.textContent = '🎉 打卡成功！';
+                            checkHolidayAndAttendance();
+                            loadHistory();
+                        } else {
+                            tip.style.color = '#dc2626'; tip.textContent = '定位失败，请确保开启 GPS 权限';
+                        }
+                    });
+                });
+            };
+
+            async function loadHistory() {
+                var uRes = await sbClient.auth.getUser();
+                if(!uRes.data || !uRes.data.user) return;
+                var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).limit(10);
+                var data = res.data;
+                document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(function(i) {
+                    return '<li><span>🟢 ' + i.clock_type + '</span><span style="color:#64748b;">' + new Date(i.clock_in_time || i.clock_time).toLocaleString() + '</span></li>';
+                }).join('');
+            }
+
+            // 员工报销
+            document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
+                e.preventDefault();
+                var btn = document.getElementById('empSubmitReimburseBtn');
+                var tip = document.getElementById('empReimburseResult');
+                var name = document.getElementById('empApplicantName').value.trim();
+                var date = document.getElementById('empApplyDate').value;
+                var amount = document.getElementById('empReimburseAmount').value;
+                var fileInput = document.getElementById('empReceiptFile');
+
+                if (!fileInput.files || fileInput.files.length === 0) { alert('请选择凭证！'); return; }
+
+                btn.disabled = true; btn.textContent = '上传中...';
+                try {
+                    var file = fileInput.files[0];
+                    var filePath = Date.now() + '_' + Math.random().toString(36).substring(7) + '.' + file.name.split('.').pop();
+                    var upRes = await sbClient.storage.from('receipts').upload(filePath, file);
+                    if (upRes.error) throw upRes.error;
+                    var urlRes = sbClient.storage.from('receipts').getPublicUrl(filePath);
+
+                    var dbRes = await sbClient.from('reimbursements').insert([{ applicant_name: name, apply_date: date, amount: parseFloat(amount), receipt_url: urlRes.data.publicUrl, status: 'Pending' }]);
+                    if (dbRes.error) throw dbRes.error;
+
+                    tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！';
+                    document.getElementById('employeeReimburseForm').reset();
+                    setupLeaveDateConstraints();
+                    loadEmpReimburseHistory();
+                } catch (err) {
+                    tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + err.message;
+                } finally {
+                    btn.disabled = false; btn.textContent = '📤 提交报销申请';
+                }
+            };
+
+            async function loadEmpReimburseHistory() {
+                var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(5);
+                var data = res.data;
+                document.getElementById('empReimburseHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无报销记录</li>' : data.map(function(i) {
+                    var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
+                    return '<li><span>🧾 [' + i.apply_date + '] $' + i.amount + '</span><span class="badge-' + cls + '">' + i.status + '</span></li>';
+                }).join('');
+            }
+
+            // 请假
+            document.getElementById('submitLeaveBtn').onclick = async function() {
+                var uRes = await sbClient.auth.getUser();
+                var type = document.getElementById('leaveType').value;
+                var start = document.getElementById('startDate').value;
+                var end = document.getElementById('endDate').value;
+                var reason = document.getElementById('leaveReason').value.trim();
+                var tip = document.getElementById('leaveResult');
+                if (!start || !end) { alert('请选择起止日期！'); return; }
+                var res = await sbClient.from('leave_requests').insert([{ user_id: uRes.data.user.id, request_type: type, start_date: start + 'T00:00:00', end_date: end + 'T23:59:59', reason: reason || '无', status: '待审批' }]);
+                if (res.error) alert('提交失败: ' + res.error.message);
+                else { tip.style.color = '#10b981'; tip.textContent = '✅ 请假申请已提交！'; loadLeaveHistory(); }
+            };
+
+            async function loadLeaveHistory() {
+                var uRes = await sbClient.auth.getUser();
+                if(!uRes.data || !uRes.data.user) return;
+                var res = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).limit(5);
+                var data = res.data;
+                document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(function(i) {
+                    var cls = i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending';
+                    return '<li><span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span><span class="badge-' + cls + '">' + i.status + '</span></li>';
+                }).join('');
+            }
+
+            // --- 管理员全功能加载 ---
+            function loadAdminData() {
+                loadAdminReimbursements();
+                loadAdminUsers();
+                loadAdminLeaves();
+                loadAdminAttendance();
+                loadAdminAnnouncements();
+                analyzeAttendanceData();
+                populateManualUserSelect();
+            }
+
+            document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
+
+            async function loadAdminReimbursements() {
+                var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
+                var data = res.data;
+                document.getElementById('adminReimburseList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="7">暂无记录</td></tr>' : data.map(function(i) {
+                    var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
+                    var preview = i.receipt_url ? '<a href="' + i.receipt_url + '" target="_blank"><img src="' + i.receipt_url + '" class="receipt-preview"/></a>' : '无';
+                    var dis = i.status!=='Pending'?'disabled':'';
+                    return '<tr>' +
+                        '<td><strong>' + i.applicant_name + '</strong></td>' +
+                        '<td>' + i.apply_date + '</td>' +
+                        '<td>$' + i.amount + '</td>' +
+                        '<td>' + preview + '</td>' +
+                        '<td><span class="badge-' + cls + '">' + i.status + '</span></td>' +
+                        '<td>' + (i.admin_remark || '-') + '</td>' +
+                        '<td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Approved\')">同意</button><button class="btn-danger" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Rejected\')">拒绝</button></td>' +
+                    '</tr>';
+                }).join('');
+            }
+
+            window.reviewReimburse = async function(id, status) {
+                var remark = prompt('审批备注 (可选):');
+                if (remark === null) return;
+                await sbClient.from('reimbursements').update({ status: status, admin_remark: remark }).eq('id', id);
+                loadAdminReimbursements();
+            };
+
+            // 地图选点弹窗
+            var mapInstance = null, markerInstance = null, tempLat = COMPANY_LOCATION.latitude, tempLng = COMPANY_LOCATION.longitude;
+            document.getElementById('openMapPickerBtn').onclick = async function() {
+                await fetchCloudLocation();
+                tempLat = COMPANY_LOCATION.latitude; tempLng = COMPANY_LOCATION.longitude;
+                document.getElementById('mapModal').style.display = 'flex';
+                setTimeout(function() {
+                    if (!mapInstance && window.AMap) {
+                        mapInstance = new AMap.Map('amapContainer', { zoom: 16, center: [tempLng, tempLat] });
+                        markerInstance = new AMap.Marker({ position: [tempLng, tempLat], map: mapInstance });
+                        mapInstance.on('click', function(e) {
+                            tempLng = e.lnglat.getLng(); tempLat = e.lnglat.getLat();
+                            markerInstance.setPosition([tempLng, tempLat]);
+                            document.getElementById('selectedAddrTip').textContent = '已选坐标：经度 ' + tempLng.toFixed(6) + ', 纬度 ' + tempLat.toFixed(6);
+                        });
+                    } else if (mapInstance) {
+                        mapInstance.setCenter([tempLng, tempLat]);
+                        markerInstance.setPosition([tempLng, tempLat]);
+                    }
+                }, 200);
+            };
+            document.getElementById('closeMapBtn').onclick = function() { document.getElementById('mapModal').style.display = 'none'; };
+            document.getElementById('confirmMapBtn').onclick = async function() {
+                COMPANY_LOCATION.latitude = tempLat; COMPANY_LOCATION.longitude = tempLng;
+                await sbClient.from('announcements').delete().eq('title', '__SYS_LOCATION__');
+                await sbClient.from('announcements').insert([{ title: '__SYS_LOCATION__', content: tempLat + ',' + tempLng }]);
+                document.getElementById('displayLat').value = tempLat.toFixed(6);
+                document.getElementById('displayLng').value = tempLng.toFixed(6);
+                document.getElementById('mapModal').style.display = 'none';
+                alert('📍 打卡定位基准已更新至云端 (550米范围生效)');
+            };
+
+            async function populateManualUserSelect() {
+                var res = await sbClient.from('profiles').select('*');
+                var sel = document.getElementById('manualUserSelect');
+                if(sel && res.data) {
+                    sel.innerHTML = res.data.map(function(p) { return '<option value="' + (p.id || p.user_id) + '">' + (p.full_name || '员工') + '</option>'; }).join('');
+                }
+            }
+
+            document.getElementById('submitManualClockBtn').onclick = async function() {
+                var userId = document.getElementById('manualUserSelect').value;
+                var type = document.getElementById('manualClockType').value;
+                var time = document.getElementById('manualClockTime').value;
+                var reason = document.getElementById('manualReason').value.trim();
+                if (!userId || !time || !reason) { alert('请填写完整补卡信息及原因！'); return; }
+                await sbClient.from('attendance').insert([{ user_id: userId, clock_type: type + ' [补卡] - ' + reason, clock_in_time: new Date(time).toISOString() }]);
+                alert('🎉 补卡记录已生成！');
+                loadAdminAttendance(); analyzeAttendanceData();
+            };
+
+            document.getElementById('refreshAttendanceBtn').onclick = function() { loadAdminAttendance(); analyzeAttendanceData(); alert('已刷新'); };
+            document.getElementById('analyzeAttendanceBtn').onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
+
+            async function analyzeAttendanceData() {
+                var aRes = await sbClient.from('attendance').select('*').limit(100);
+                var pRes = await sbClient.from('profiles').select('*');
+                var records = aRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; 
+                if (profiles) { profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; }); }
+                if(!records) return;
+
+                var normal = 0, abnormal = 0;
+                document.getElementById('adminAttendanceAnalysisList').innerHTML = records.map(function(r) {
+                    var isAbab = r.clock_type.indexOf('异常') !== -1 || r.clock_type.indexOf('迟到') !== -1 || r.clock_type.indexOf('补卡') !== -1;
+                    if(isAbab) abnormal++; else normal++;
+                    return '<tr><td>' + (pMap[r.user_id]||'未知') + '</td><td>' + r.clock_type + '</td><td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td><td><span class="badge-' + (isAbab?'abnormal':'normal') + '">' + (isAbab?'异常':'正常') + '</span></td></tr>';
+                }).join('');
+                document.getElementById('statTotal').textContent = records.length;
+                document.getElementById('statNormal').textContent = normal;
+                document.getElementById('statLate').textContent = abnormal;
+            }
+
+            document.getElementById('publishAnnouncementBtn').onclick = async function() {
+                var title = document.getElementById('announcementTitleInput').value.trim();
+                var content = document.getElementById('announcementContentInput').value.trim();
+                if(!title || !content) { alert('标题和内容不能为空'); return; }
+                await sbClient.from('announcements').insert([{ title: title, content: content }]);
+                document.getElementById('announcementTitleInput').value = '';
+                document.getElementById('announcementContentInput').value = '';
+                loadAdminAnnouncements();
+                alert('📢 公告发布成功！');
+            };
+
+            async function loadAdminAnnouncements() {
+                var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false });
+                var data = res.data;
+                document.getElementById('adminAnnouncementList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无公告</td></tr>' : data.map(function(i) {
+                    return '<tr><td><strong>' + i.title + '</strong><br><small>' + i.content + '</small></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement(\'' + i.id + '\')">删除</button></td></tr>';
+                }).join('');
+            }
+            window.deleteAnnouncement = async function(id) { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
+
+            async function loadAdminUsers() {
+                var res = await sbClient.from('profiles').select('*');
+                var data = res.data;
+                document.getElementById('adminUserList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">无用户</td></tr>' : data.map(function(u) {
+                    var uid = u.id || u.user_id;
+                    var approved = u.is_approved || u.status === '已批准';
+                    var dis = approved ? 'disabled' : '';
+                    return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td>' + (approved?'已批准':'待审核') + '</td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewUser(\'' + uid + '\', false)">拒绝</button></td></tr>';
+                }).join('');
+            }
+            window.reviewUser = async function(id, isApproved) {
+                await sbClient.from('profiles').update({ is_approved: isApproved, status: isApproved ? '已批准' : '已拒绝' }).eq('id', id);
+                loadAdminUsers();
+            };
+
+            async function loadAdminLeaves() {
+                var lRes = await sbClient.from('leave_requests').select('*');
+                var pRes = await sbClient.from('profiles').select('*');
+                var leaves = lRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+
+                document.getElementById('adminLeaveList').innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假</td></tr>' : leaves.map(function(l) {
+                    var dis = l.status!=='待审批'?'disabled':'';
+                    return '<tr><td>' + pMap[l.user_id] + ' (' + l.request_type + ')</td><td>' + (l.start_date?l.start_date.slice(0,10):'') + '~' + (l.end_date?l.end_date.slice(0,10):'') + '</td><td>' + l.reason + '</td><td>' + l.status + '</td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', \'' + l.user_id + '\', \'' + l.request_type + '\', \'已批准\')">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', false, false, \'已拒绝\')">拒绝</button></td></tr>';
+                }).join('');
+            }
+            window.reviewLeave = async function(id, uid, type, status) {
+                await sbClient.from('leave_requests').update({ status: status }).eq('id', id);
+                if(status === '已批准') await sbClient.from('attendance').insert([{ user_id: uid, clock_type: '请假(' + type + ')', clock_in_time: new Date().toISOString() }]);
+                loadAdminLeaves(); loadAdminAttendance();
+            };
+
+            async function loadAdminAttendance() {
+                var aRes = await sbClient.from('attendance').select('*').limit(50);
+                var pRes = await sbClient.from('profiles').select('*');
+                var records = aRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+                document.getElementById('adminAttendanceList').innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(function(r) {
+                    return '<tr><td>' + (pMap[r.user_id]||'未知') + '</td><td>' + r.clock_type + '</td><td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td></tr>';
+                }).join('');
+            }
+
+            document.getElementById('exportExcelBtn').onclick = async function() {
+                if (typeof XLSX === 'undefined') { alert("Excel 组件尚未完全加载，请稍候！"); return; }
+                var aRes = await sbClient.from('attendance').select('*');
+                var pRes = await sbClient.from('profiles').select('*');
+                var records = aRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+                if(!records) return;
+                var excelData = records.map(function(i) {
+                    return {
+                        '员工姓名': pMap[i.user_id] || '未知',
+                        '打卡时间': new Date(i.clock_in_time || i.clock_time).toLocaleString(),
+                        '打卡说明': i.clock_type
+                    };
+                });
+                var ws = XLSX.utils.json_to_sheet(excelData);
+                var wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "考勤统计");
+                XLSX.writeFile(wb, '企业考勤报表_' + new Date().toISOString().slice(0,10) + '.xlsx');
+            };
+        });
+    </script>
+</body>
+</html>
