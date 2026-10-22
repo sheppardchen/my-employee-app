@@ -296,7 +296,7 @@
                 </div>
             </div>
 
-            <!-- 提交报销申请模块（新增） -->
+            <!-- 提交报销申请模块 -->
             <div class="card" style="border: 2px solid #8b5cf6;">
                 <h3 style="color:#7c3aed;">📝 提交报销申请</h3>
                 <form id="employeeReimburseForm" onsubmit="handleEmployeeReimburseSubmit(event)">
@@ -360,7 +360,7 @@
                 <button class="logout-btn" id="adminLogoutBtn" type="button">退出</button>
             </div>
 
-            <!-- 报销审批控制台（新增） -->
+            <!-- 报销审批控制台 -->
             <div class="card" style="border: 2px solid #7c3aed;">
                 <h3>
                     <span style="color:#7c3aed;">📋 报销申请审批控制台</span>
@@ -386,8 +386,8 @@
 
             <!-- 地图选点修改定位配置面板 -->
             <div class="card" style="border: 2px solid var(--primary-color);">
-                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (250米电子围栏)</h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡范围自动限制在 250 米内。</p>
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (550米电子围栏)</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡范围自动限制在 550 米内。</p>
                 
                 <div class="flex-row">
                     <div class="input-group">
@@ -547,7 +547,8 @@
                 auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             });
 
-            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 250 };
+            // 🎯 此处已将围栏范围修改为 550 米
+            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
 
             function setupLeaveDateConstraints() {
                 const today = new Date();
@@ -883,9 +884,9 @@
                                 if (distance > COMPANY_LOCATION.maxDistance) {
                                     if(tip) {
                                         tip.style.color = '#dc2626';
-                                        tip.textContent = `❌ 打卡失败：当前距离打卡点 ${Math.round(distance)}米 (超出250米范围)`;
+                                        tip.textContent = `❌ 打卡失败：当前距离打卡点 ${Math.round(distance)}米 (超出550米范围)`;
                                     }
-                                    alert(`不在打卡范围内！当前距离 ${Math.round(distance)}米，超出 250 米限制。`);
+                                    alert(`不在打卡范围内！当前距离 ${Math.round(distance)}米，超出 550 米限制。`);
                                     return;
                                 }
 
@@ -1126,7 +1127,7 @@
                     if(lngInput) lngInput.value = tempSelectedLng.toFixed(6);
 
                     mapModal.style.display = 'none';
-                    alert(`📍 打卡定位已同步云端！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}\n围栏范围: 250米`);
+                    alert(`📍 打卡定位已同步云端！\n新经度: ${tempSelectedLng.toFixed(6)}\n新纬度: ${tempSelectedLat.toFixed(6)}\n围栏范围: 550米`);
                 };
             }
 
@@ -1427,109 +1428,4 @@
                 const tbody = document.getElementById('adminLeaveList');
                 if(tbody) tbody.innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假申请</td></tr>' : leaves.map(l => {
                     const fullName = profileMap[l.user_id] || '未知';
-                    const isProcessed = l.status !== '待审批';
-                    return `<tr><td>${fullName} (${l.request_type})</td><td>${l.start_date?l.start_date.slice(0,10):''}~${l.end_date?l.end_date.slice(0,10):''}</td><td>${l.reason}</td><td>${l.status}</td><td class="action-btns"><button class="btn-success" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', '${l.user_id}', '${l.request_type}', '${l.start_date}', '${l.end_date}', '已批准')">批准</button><button class="btn-danger" ${isProcessed?'disabled':''} onclick="updateLeave('${l.id}', false, false, false, false, '已拒绝')">拒绝</button></td></tr>`;
-                }).join('');
-            }
-
-            window.updateLeave = async (leaveId, userId, leaveType, startStr, endStr, status) => {
-                await sbClient.from('leave_requests').update({ status }).eq('id', leaveId);
-                if (status === '已批准') {
-                    await sbClient.from('attendance').insert([{ user_id: userId, clock_type: `请假(${leaveType})`, clock_in_time: new Date().toISOString() }]);
-                }
-                loadAdminLeaves(); loadAdminAttendance(); analyzeAttendanceData();
-            };
-
-            async function loadAdminAttendance() {
-                const { data: records } = await sbClient.from('attendance').select('*').limit(50);
-                const { data: profiles } = await sbClient.from('profiles').select('*');
-                const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
-
-                const tbody = document.getElementById('adminAttendanceList');
-                if(tbody) tbody.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(r => `<tr><td>${profileMap[r.user_id] || '未知'}</td><td>${r.clock_type}</td><td>${r.clock_in_time ? new Date(r.clock_in_time).toLocaleString() : ''}</td></tr>`).join('');
-            }
-
-            const exportExcelBtn = document.getElementById('exportExcelBtn');
-            if (exportExcelBtn) {
-                exportExcelBtn.onclick = async function() {
-                    const { data: records } = await sbClient.from('attendance').select('*');
-                    const { data: profiles } = await sbClient.from('profiles').select('*');
-                    const profileMap = {}; if (profiles) profiles.forEach(p => profileMap[p.id || p.user_id] = p.full_name);
-
-                    if (!records) return;
-
-                    const excelData = records.map(i => {
-                        const timeObj = new Date(i.clock_in_time || i.clock_time);
-                        const dateStr = timeObj.toLocaleDateString();
-                        const timeStr = timeObj.toLocaleTimeString();
-                        const typeStr = i.clock_type || '';
-
-                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
-
-                        if (timeObj) {
-                            const hour = timeObj.getHours();
-                            const minute = timeObj.getMinutes();
-                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
-                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
-                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
-                            if (isOut && hour < 18) isAbnormal = true;
-                        }
-
-                        return {
-                            '员工姓名': profileMap[i.user_id] || '未知员工',
-                            '打卡日期': dateStr,
-                            '打卡详细时间': timeStr,
-                            '当日上班时间段/具体说明': i.clock_type,
-                            '状态判定': isAbnormal ? '异常 / 违规' : '正常'
-                        };
-                    });
-
-                    const userStats = {};
-                    records.forEach(i => {
-                        const uid = i.user_id;
-                        const name = profileMap[uid] || '未知员工';
-                        if (!userStats[uid]) {
-                            userStats[uid] = { name: name, totalDaysSet: new Set(), abnormalCount: 0 };
-                        }
-                        const timeObj = new Date(i.clock_in_time || i.clock_time);
-                        const dayKey = timeObj.toISOString().slice(0, 10);
-                        userStats[uid].totalDaysSet.add(dayKey);
-
-                        const typeStr = i.clock_type || '';
-                        let isAbnormal = typeStr.includes('异常') || typeStr.includes('迟到') || typeStr.includes('早退') || typeStr.includes('补卡');
-                        if (timeObj) {
-                            const hour = timeObj.getHours();
-                            const minute = timeObj.getMinutes();
-                            const isIn = (typeStr === 'in' || typeStr.includes('上班'));
-                            const isOut = (typeStr === 'out' || typeStr.includes('下班'));
-                            if (isIn && (hour > 9 || (hour === 9 && minute > 0))) isAbnormal = true;
-                            if (isOut && hour < 18) isAbnormal = true;
-                        }
-
-                        if (isAbnormal) userStats[uid].abnormalCount++;
-                    });
-
-                    excelData.push({}); 
-                    excelData.push({ '员工姓名': '=== 以下为每个员工月度考勤总计与统计 ===' });
-
-                    Object.keys(userStats).forEach(uid => {
-                        const stat = userStats[uid];
-                        excelData.push({
-                            '员工姓名': stat.name,
-                            '打卡日期': `总计出勤天数: ${stat.totalDaysSet.size} 天`,
-                            '打卡详细时间': `异常打卡次数: ${stat.abnormalCount} 次`,
-                            '当日上班时间段/具体说明': stat.abnormalCount === 0 ? '全勤表现良好' : '存在迟到/早退/异常记录，请核查',
-                            '状态判定': stat.abnormalCount === 0 ? '正常' : '需关注'
-                        });
-                    });
-
-                    const ws = XLSX.utils.json_to_sheet(excelData);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "全员考勤明细与统计");
-                    XLSX.writeFile(wb, `企业全员考勤及月度统计报表_${new Date().toISOString().slice(0,10)}.xlsx`);
-                };
-            }
-        });
-    </script>
-</body>
-</html>
+                    const isProcessed = l.status !==
