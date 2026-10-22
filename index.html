@@ -622,19 +622,34 @@
             document.getElementById('toLoginBtn').onclick = function() { showSection(loginSection); };
             document.getElementById('backToLoginBtn').onclick = function() { showSection(loginSection); };
 
+            // 登录核心逻辑（增加全面的异常兜底与按钮状态强制重置）
             async function handleLogin() {
-                var email = document.getElementById('loginEmail').value.trim();
-                var password = document.getElementById('loginPassword').value.trim();
+                var emailInput = document.getElementById('loginEmail');
+                var passInput = document.getElementById('loginPassword');
                 var btn = document.getElementById('loginBtn');
 
-                if (!email || !password) { alert('请输入工作邮箱和密码！'); return; }
+                if (!emailInput || !passInput || !btn) {
+                    alert('页面元素未加载完全，请刷新重试！');
+                    return;
+                }
+
+                var email = emailInput.value.trim();
+                var password = passInput.value.trim();
+
+                if (!email || !password) { 
+                    alert('请输入工作邮箱和密码！'); 
+                    return; 
+                }
 
                 btn.disabled = true;
                 btn.textContent = '登录中...';
 
                 try {
                     var res = await sbClient.auth.signInWithPassword({ email: email, password: password });
-                    if (res.error) { alert('登录失败: ' + res.error.message); return; }
+                    if (res.error) { 
+                        alert('登录失败: ' + res.error.message); 
+                        return; 
+                    }
 
                     var pRes = await sbClient.from('profiles').select('*').eq('id', res.data.user.id).maybeSingle();
                     var profile = pRes.data;
@@ -661,13 +676,16 @@
                 } catch (err) {
                     alert('登录发生异常: ' + (err.message || err));
                 } finally {
+                    // 无论成功或报错，务必恢复按钮状态，防止死锁卡死
                     btn.disabled = false;
                     btn.textContent = '登录系统';
                 }
             }
 
             var loginBtn = document.getElementById('loginBtn');
-            loginBtn.onclick = handleLogin;
+            if(loginBtn) {
+                loginBtn.onclick = handleLogin;
+            }
 
             async function handleRegister() {
                 var name = document.getElementById('regName').value.trim();
@@ -700,7 +718,7 @@
                 }
             }
             var regBtn = document.getElementById('registerBtn');
-            regBtn.onclick = handleRegister;
+            if(regBtn) regBtn.onclick = handleRegister;
 
             async function checkSession() {
                 try {
@@ -728,13 +746,17 @@
             }
             checkSession();
 
-            document.getElementById('logoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
-            document.getElementById('adminLogoutBtn').onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
+            var logoutBtn = document.getElementById('logoutBtn');
+            if(logoutBtn) logoutBtn.onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
+            var adminLogoutBtn = document.getElementById('adminLogoutBtn');
+            if(adminLogoutBtn) adminLogoutBtn.onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
 
             setInterval(function() {
                 var now = new Date();
-                document.getElementById('liveClock').textContent = now.toTimeString().split(' ')[0];
-                document.getElementById('liveDate').textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+                var liveClock = document.getElementById('liveClock');
+                var liveDate = document.getElementById('liveDate');
+                if(liveClock) liveClock.textContent = now.toTimeString().split(' ')[0];
+                if(liveDate) liveDate.textContent = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             }, 1000);
 
             function setupLeaveDateConstraints() {
@@ -756,8 +778,10 @@
                         if (parts.length === 2) {
                             COMPANY_LOCATION.latitude = parseFloat(parts[0]);
                             COMPANY_LOCATION.longitude = parseFloat(parts[1]);
-                            document.getElementById('displayLat').value = COMPANY_LOCATION.latitude.toFixed(6);
-                            document.getElementById('displayLng').value = COMPANY_LOCATION.longitude.toFixed(6);
+                            var dLat = document.getElementById('displayLat');
+                            var dLng = document.getElementById('displayLng');
+                            if(dLat) dLat.value = COMPANY_LOCATION.latitude.toFixed(6);
+                            if(dLng) dLng.value = COMPANY_LOCATION.longitude.toFixed(6);
                         }
                     }
                 } catch(e) {}
@@ -775,16 +799,19 @@
             async function loadAnnouncements() {
                 var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
                 var data = res.data;
-                document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(function(i) {
-                    var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
-                    return '<div class="announcement-item">' +
-                        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
-                            '<strong style="color:#b45309;">' + i.title + '</strong>' +
-                            '<span style="font-size:11px; color:#94a3b8;">⏱️ ' + timeStr + '</span>' +
-                        '</div>' +
-                        '<span style="font-size:13px; color:#475569; display:block; line-height:1.5;">' + i.content + '</span>' +
-                    '</div>';
-                }).join('');
+                var listEl = document.getElementById('announcementList');
+                if(listEl) {
+                    listEl.innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(function(i) {
+                        var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
+                        return '<div class="announcement-item">' +
+                            '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+                                '<strong style="color:#b45309;">' + i.title + '</strong>' +
+                                '<span style="font-size:11px; color:#94a3b8;">⏱️ ' + timeStr + '</span>' +
+                            '</div>' +
+                            '<span style="font-size:13px; color:#475569; display:block; line-height:1.5;">' + i.content + '</span>' +
+                        '</div>';
+                    }).join('');
+                }
             }
 
             async function checkHolidayAndAttendance() {
@@ -793,13 +820,14 @@
                 var isHoliday = (now.getDay() === 0 || now.getDay() === 6);
                 var banner = document.getElementById('holidayBanner');
                 var btn = document.getElementById('clockBtn');
+                if(!btn) return;
                 if (isHoliday) {
-                    banner.style.display = 'block';
+                    if(banner) banner.style.display = 'block';
                     btn.className = 'clock-circle-btn btn-done';
                     btn.disabled = true;
                     return;
                 }
-                banner.style.display = 'none';
+                if(banner) banner.style.display = 'none';
 
                 var uRes = await sbClient.auth.getUser();
                 if (!uRes.data || !uRes.data.user) return;
@@ -821,13 +849,13 @@
                     document.getElementById('clockBtnMainText').textContent = '下班打卡';
                     document.getElementById('clockBtnSubText').textContent = '18:00 后';
                     btn.disabled = false;
-                    tip.style.color = '#10b981'; tip.textContent = '✅ 已完成上班打卡';
+                    if(tip) { tip.style.color = '#10b981'; tip.textContent = '✅ 已完成上班打卡'; }
                 } else {
                     btn.className = 'clock-circle-btn btn-done';
                     document.getElementById('clockBtnMainText').textContent = '已打卡';
                     document.getElementById('clockBtnSubText').textContent = '考勤完成';
                     btn.disabled = true;
-                    tip.style.color = '#10b981'; tip.textContent = '🎉 今日考勤已全部完成！';
+                    if(tip) { tip.style.color = '#10b981'; tip.textContent = '🎉 今日考勤已全部完成！'; }
                 }
             }
 
@@ -839,135 +867,144 @@
                 return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
             }
 
-            document.getElementById('clockBtn').onclick = async function() {
-                var tip = document.getElementById('clockResult');
-                tip.style.color = '#2563eb'; tip.textContent = '📍 获取高德定位中...';
-                await fetchCloudLocation();
+            var clockBtn = document.getElementById('clockBtn');
+            if(clockBtn) {
+                clockBtn.onclick = async function() {
+                    var tip = document.getElementById('clockResult');
+                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '📍 获取高德定位中...'; }
+                    await fetchCloudLocation();
 
-                if (!window.AMap) { alert("高德地图接口加载失败，请刷新！"); return; }
+                    if (!window.AMap) { alert("高德地图接口加载失败，请刷新！"); return; }
 
-                AMap.plugin('AMap.Geolocation', function() {
-                    var geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 15000 });
-                    geolocation.getCurrentPosition(async function(status, result) {
-                        if (status === 'complete') {
-                            var dist = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
-                            if (dist > COMPANY_LOCATION.maxDistance) {
-                                tip.style.color = '#dc2626';
-                                tip.textContent = '❌ 距离打卡点 ' + Math.round(dist) + '米 (超出范围)';
-                                alert('不在打卡范围内！当前距离 ' + Math.round(dist) + '米');
-                                return;
+                    AMap.plugin('AMap.Geolocation', function() {
+                        var geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 15000 });
+                        geolocation.getCurrentPosition(async function(status, result) {
+                            if (status === 'complete') {
+                                var dist = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
+                                if (dist > COMPANY_LOCATION.maxDistance) {
+                                    if(tip) {
+                                        tip.style.color = '#dc2626';
+                                        tip.textContent = '❌ 距离打卡点 ' + Math.round(dist) + '米 (超出范围)';
+                                    }
+                                    alert('不在打卡范围内！当前距离 ' + Math.round(dist) + '米');
+                                    return;
+                                }
+                                var now = new Date();
+                                var statusTag = (currentClockState === 'in' && (now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0))) ? '异常(迟到)' : '正常';
+                                var label = currentClockState === 'in' ? ('上班打卡 [' + statusTag + ']') : ('下班打卡 [' + statusTag + ']');
+                                var uRes = await sbClient.auth.getUser();
+                                await sbClient.from('attendance').insert([{ user_id: uRes.data.user.id, clock_type: label }]);
+                                if(tip) { tip.style.color = '#10b981'; tip.textContent = '🎉 打卡成功！'; }
+                                checkHolidayAndAttendance();
+                                loadHistory();
+                            } else {
+                                if(tip) { tip.style.color = '#dc2626'; tip.textContent = '定位失败，请确保开启 GPS 权限'; }
                             }
-                            var now = new Date();
-                            var statusTag = (currentClockState === 'in' && (now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0))) ? '异常(迟到)' : '正常';
-                            var label = currentClockState === 'in' ? ('上班打卡 [' + statusTag + ']') : ('下班打卡 [' + statusTag + ']');
-                            var uRes = await sbClient.auth.getUser();
-                            await sbClient.from('attendance').insert([{ user_id: uRes.data.user.id, clock_type: label }]);
-                            tip.style.color = '#10b981'; tip.textContent = '🎉 打卡成功！';
-                            checkHolidayAndAttendance();
-                            loadHistory();
-                        } else {
-                            tip.style.color = '#dc2626'; tip.textContent = '定位失败，请确保开启 GPS 权限';
-                        }
+                        });
                     });
-                });
-            };
+                };
+            }
 
-            // 核心修改：客户端考勤打卡记录过滤，不展示请假记录
             async function loadHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
                 var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).limit(20);
                 var data = res.data;
-                
-                // 过滤掉包含“请假”字样的特殊记录
                 var filteredData = data ? data.filter(function(i) {
                     var typeStr = String(i.clock_type || '');
                     return typeStr.indexOf('请假') === -1;
                 }) : [];
 
-                document.getElementById('historyList').innerHTML = (filteredData.length === 0) ? '<li>暂无打卡记录</li>' : filteredData.map(function(i) {
-                    var cType = formatClockType(i.clock_type);
-                    var isAb = isAbnormalType(cType);
-                    var badgeClass = isAb ? 'badge-abnormal' : 'badge-normal';
-                    var statusText = isAb ? '异常' : '正常';
-                    return '<li>' +
-                        '<span>🟢 ' + cType + '</span>' +
-                        '<span style="display:flex; align-items:center; gap:8px;">' +
-                            '<span class="' + badgeClass + '">' + statusText + '</span>' +
-                            '<small style="color:#64748b;">' + new Date(i.clock_in_time || i.clock_time).toLocaleString() + '</small>' +
-                        '</span>' +
-                    '</li>';
-                }).join('');
+                var historyList = document.getElementById('historyList');
+                if(historyList) {
+                    historyList.innerHTML = (filteredData.length === 0) ? '<li>暂无打卡记录</li>' : filteredData.map(function(i) {
+                        var cType = formatClockType(i.clock_type);
+                        var isAb = isAbnormalType(cType);
+                        var badgeClass = isAb ? 'badge-abnormal' : 'badge-normal';
+                        var statusText = isAb ? '异常' : '正常';
+                        return '<li>' +
+                            '<span>🟢 ' + cType + '</span>' +
+                            '<span style="display:flex; align-items:center; gap:8px;">' +
+                                '<span class="' + badgeClass + '">' + statusText + '</span>' +
+                                '<small style="color:#64748b;">' + new Date(i.clock_in_time || i.clock_time).toLocaleString() + '</small>' +
+                            '</span>' +
+                        '</li>';
+                    }).join('');
+                }
             }
 
-            document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
-                e.preventDefault();
-                var btn = document.getElementById('empSubmitReimburseBtn');
-                var tip = document.getElementById('empReimburseResult');
-                var name = document.getElementById('empApplicantName').value.trim();
-                var date = document.getElementById('empApplyDate').value;
-                var amountStr = document.getElementById('empReimburseAmount').value;
-                var fileInput = document.getElementById('empReceiptFile');
+            var empReimburseForm = document.getElementById('employeeReimburseForm');
+            if(empReimburseForm) {
+                empReimburseForm.onsubmit = async function(e) {
+                    e.preventDefault();
+                    var btn = document.getElementById('empSubmitReimburseBtn');
+                    var tip = document.getElementById('empReimburseResult');
+                    var name = document.getElementById('empApplicantName').value.trim();
+                    var date = document.getElementById('empApplyDate').value;
+                    var amountStr = document.getElementById('empReimburseAmount').value;
+                    var fileInput = document.getElementById('empReceiptFile');
 
-                if (!name || !date || !amountStr || !fileInput.files || fileInput.files.length === 0) {
-                    alert('请完整填写报销信息并选择凭证！');
-                    return;
-                }
-                var amount = parseFloat(amountStr);
-
-                if (btn.disabled) return;
-                btn.disabled = true; 
-                btn.textContent = '正在提交...';
-                tip.style.color = '#7c3aed'; 
-                tip.textContent = '⏳ 正在校验并上传报销申请...';
-
-                try {
-                    var checkDup = await sbClient.from('reimbursements').select('*').eq('applicant_name', name).eq('apply_date', date).eq('amount', amount).limit(1);
-                    if (checkDup.data && checkDup.data.length > 0) {
-                        tip.style.color = '#dc2626'; 
-                        tip.textContent = '❌ 检测到相同日期与金额的报销记录已存在，请勿重复提交！';
-                        btn.disabled = false; 
-                        btn.textContent = '📤 提交报销申请';
+                    if (!name || !date || !amountStr || !fileInput.files || fileInput.files.length === 0) {
+                        alert('请完整填写报销信息并选择凭证！');
                         return;
                     }
+                    var amount = parseFloat(amountStr);
 
-                    var file = fileInput.files[0];
-                    var filePath = Date.now() + '_' + Math.random().toString(36).substring(7) + '.' + file.name.split('.').pop();
-                    var upRes = await sbClient.storage.from('receipts').upload(filePath, file);
-                    if (upRes.error) throw upRes.error;
-                    var urlRes = sbClient.storage.from('receipts').getPublicUrl(filePath);
+                    if (btn.disabled) return;
+                    btn.disabled = true; 
+                    btn.textContent = '正在提交...';
+                    if(tip) { tip.style.color = '#7c3aed'; tip.textContent = '⏳ 正在校验并上传报销申请...'; }
 
-                    var dbRes = await sbClient.from('reimbursements').insert([{ applicant_name: name, apply_date: date, amount: amount, receipt_url: urlRes.data.publicUrl, status: 'Pending' }]);
-                    if (dbRes.error) throw dbRes.error;
+                    try {
+                        var checkDup = await sbClient.from('reimbursements').select('*').eq('applicant_name', name).eq('apply_date', date).eq('amount', amount).limit(1);
+                        if (checkDup.data && checkDup.data.length > 0) {
+                            if(tip) { tip.style.color = '#dc2626'; tip.textContent = '❌ 检测到相同日期与金额的报销记录已存在，请勿重复提交！'; }
+                            btn.disabled = false; 
+                            btn.textContent = '📤 提交报销申请';
+                            return;
+                        }
 
-                    tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！';
-                    
-                    document.getElementById('empReimburseAmount').value = '';
-                    document.getElementById('empReceiptFile').value = '';
-                    setupLeaveDateConstraints();
-                    loadEmpReimburseHistory();
-                } catch (err) {
-                    tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + err.message;
-                } finally {
-                    btn.disabled = false; 
-                    btn.textContent = '📤 提交报销申请';
-                }
-            };
+                        var file = fileInput.files[0];
+                        var filePath = Date.now() + '_' + Math.random().toString(36).substring(7) + '.' + file.name.split('.').pop();
+                        var upRes = await sbClient.storage.from('receipts').upload(filePath, file);
+                        if (upRes.error) throw upRes.error;
+                        var urlRes = sbClient.storage.from('receipts').getPublicUrl(filePath);
+
+                        var dbRes = await sbClient.from('reimbursements').insert([{ applicant_name: name, apply_date: date, amount: amount, receipt_url: urlRes.data.publicUrl, status: 'Pending' }]);
+                        if (dbRes.error) throw dbRes.error;
+
+                        if(tip) { tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！'; }
+                        
+                        document.getElementById('empReimburseAmount').value = '';
+                        document.getElementById('empReceiptFile').value = '';
+                        setupLeaveDateConstraints();
+                        loadEmpReimburseHistory();
+                    } catch (err) {
+                        if(tip) { tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + err.message; }
+                    } finally {
+                        btn.disabled = false; 
+                        btn.textContent = '📤 提交报销申请';
+                    }
+                };
+            }
 
             async function loadEmpReimburseHistory() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(10);
                 empReimbursementsCache = res.data || [];
-                document.getElementById('empReimburseHistoryList').innerHTML = (empReimbursementsCache.length === 0) ? '<li>暂无报销记录</li>' : empReimbursementsCache.map(function(i, idx) {
-                    var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
-                    var statusCn = i.status==='Approved'?'已同意':i.status==='Rejected'?'已拒绝':'审核中';
-                    return '<li>' +
-                        '<span>🧾 [' + i.apply_date + '] ' + i.amount + '</span>' +
-                        '<span style="display:flex; align-items:center; gap:8px;">' +
-                            '<span class="badge-' + cls + '">' + statusCn + '</span>' +
-                            '<button class="btn-sm" style="background:#7c3aed; color:white; padding:2px 8px; font-size:11px;" onclick="viewReimburseDetail(' + idx + ')">🔍 详情</button>' +
-                        '</span>' +
-                    '</li>';
-                }).join('');
+                var listEl = document.getElementById('empReimburseHistoryList');
+                if(listEl) {
+                    listEl.innerHTML = (empReimbursementsCache.length === 0) ? '<li>暂无报销记录</li>' : empReimbursementsCache.map(function(i, idx) {
+                        var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
+                        var statusCn = i.status==='Approved'?'已同意':i.status==='Rejected'?'已拒绝':'审核中';
+                        return '<li>' +
+                            '<span>🧾 [' + i.apply_date + '] ' + i.amount + '</span>' +
+                            '<span style="display:flex; align-items:center; gap:8px;">' +
+                                '<span class="badge-' + cls + '">' + statusCn + '</span>' +
+                                '<button class="btn-sm" style="background:#7c3aed; color:white; padding:2px 8px; font-size:11px;" onclick="viewReimburseDetail(' + idx + ')">🔍 详情</button>' +
+                            '</span>' +
+                        '</li>';
+                    }).join('');
+                }
             }
 
             window.viewReimburseDetail = function(idx) {
@@ -980,9 +1017,11 @@
                 var statusCn = item.status==='Approved'?'✅ 已通过 / 已准许':item.status==='Rejected'?'❌ 已拒绝 / 未通过':'⏳ 正在审核中';
                 var statusColor = item.status==='Approved'?'#16a34a':item.status==='Rejected'?'#dc2626':'#d97706';
                 var detailStatusEl = document.getElementById('detailStatus');
-                detailStatusEl.textContent = statusCn;
-                detailStatusEl.style.color = statusColor;
-                detailStatusEl.style.fontWeight = 'bold';
+                if(detailStatusEl) {
+                    detailStatusEl.textContent = statusCn;
+                    detailStatusEl.style.color = statusColor;
+                    detailStatusEl.style.fontWeight = 'bold';
+                }
 
                 document.getElementById('detailRemark').textContent = item.admin_remark || '无备注';
 
@@ -997,84 +1036,90 @@
                 document.getElementById('reimburseDetailModal').style.display = 'flex';
             };
 
-            document.getElementById('closeReimburseDetailBtn').onclick = function() {
-                document.getElementById('reimburseDetailModal').style.display = 'none';
-            };
+            var closeReimburseDetailBtn = document.getElementById('closeReimburseDetailBtn');
+            if(closeReimburseDetailBtn) {
+                closeReimburseDetailBtn.onclick = function() {
+                    document.getElementById('reimburseDetailModal').style.display = 'none';
+                };
+            }
 
-            // 员工请假申请提交
-            document.getElementById('submitLeaveBtn').onclick = async function() {
-                var btn = document.getElementById('submitLeaveBtn');
-                var uRes = await sbClient.auth.getUser();
-                if (!uRes.data || !uRes.data.user) return;
-                
-                var type = document.getElementById('leaveType').value;
-                var start = document.getElementById('startDate').value;
-                var end = document.getElementById('endDate').value;
-                var reason = document.getElementById('leaveReason').value.trim();
-                var tip = document.getElementById('leaveResult');
-                
-                if (!start || !end) {
-                    alert('请选择请假起止日期！');
-                    return;
-                }
-
-                if (btn.disabled) return;
-                btn.disabled = true;
-                btn.textContent = '正在提交申请...';
-                tip.style.color = '#2563eb';
-                tip.textContent = '⏳ 校验并提交中...';
-
-                try {
-                    var dupCheck = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).eq('request_type', type).eq('start_date', start + 'T00:00:00').eq('end_date', end + 'T23:59:59');
-                    if (dupCheck.data && dupCheck.data.length > 0) {
-                        tip.style.color = '#dc2626';
-                        tip.textContent = '❌ 您已提交过相同时间段的同类型请假申请，请勿重复提交！';
-                        btn.disabled = false;
-                        btn.textContent = '提交请假申请';
+            var submitLeaveBtn = document.getElementById('submitLeaveBtn');
+            if(submitLeaveBtn) {
+                submitLeaveBtn.onclick = async function() {
+                    var btn = submitLeaveBtn;
+                    var uRes = await sbClient.auth.getUser();
+                    if (!uRes.data || !uRes.data.user) return;
+                    
+                    var type = document.getElementById('leaveType').value;
+                    var start = document.getElementById('startDate').value;
+                    var end = document.getElementById('endDate').value;
+                    var reason = document.getElementById('leaveReason').value.trim();
+                    var tip = document.getElementById('leaveResult');
+                    
+                    if (!start || !end) {
+                        alert('请选择请假起止日期！');
                         return;
                     }
 
-                    var res = await sbClient.from('leave_requests').insert([{ user_id: uRes.data.user.id, request_type: type, start_date: start + 'T00:00:00', end_date: end + 'T23:59:59', reason: reason || '无', status: '待审批' }]);
-                    if (res.error) throw res.error;
-                    
-                    tip.style.color = '#10b981'; 
-                    tip.textContent = '✅ 请假申请已成功提交！';
-                    
-                    document.getElementById('startDate').value = '';
-                    document.getElementById('endDate').value = '';
-                    document.getElementById('leaveReason').value = '';
-                    setupLeaveDateConstraints();
-                    
-                    loadLeaveHistory();
-                } catch(e) {
-                    tip.style.color = '#dc2626';
-                    tip.textContent = '提交失败: ' + e.message;
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = '提交请假申请';
-                }
-            };
+                    if (btn.disabled) return;
+                    btn.disabled = true;
+                    btn.textContent = '正在提交申请...';
+                    if(tip) { tip.style.color = '#2563eb'; tip.textContent = '⏳ 校验并提交中...'; }
 
-            document.getElementById('refreshLeaveHistoryBtn').onclick = function() {
-                loadLeaveHistory();
-                alert('已从云端同步最新请假状态！');
-            };
+                    try {
+                        var dupCheck = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).eq('request_type', type).eq('start_date', start + 'T00:00:00').eq('end_date', end + 'T23:59:59');
+                        if (dupCheck.data && dupCheck.data.length > 0) {
+                            if(tip) { tip.style.color = '#dc2626'; tip.textContent = '❌ 您已提交过相同时间段的同类型请假申请，请勿重复提交！'; }
+                            btn.disabled = false;
+                            btn.textContent = '提交请假申请';
+                            return;
+                        }
+
+                        var res = await sbClient.from('leave_requests').insert([{ user_id: uRes.data.user.id, request_type: type, start_date: start + 'T00:00:00', end_date: end + 'T23:59:59', reason: reason || '无', status: '待审批' }]);
+                        if (res.error) throw res.error;
+                        
+                        if(tip) { tip.style.color = '#10b981'; tip.textContent = '✅ 请假申请已成功提交！'; }
+                        
+                        document.getElementById('startDate').value = '';
+                        document.getElementById('endDate').value = '';
+                        document.getElementById('leaveReason').value = '';
+                        setupLeaveDateConstraints();
+                        
+                        loadLeaveHistory();
+                    } catch(e) {
+                        if(tip) { tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + e.message; }
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = '提交请假申请';
+                    }
+                };
+            }
+
+            var refreshLeaveHistoryBtn = document.getElementById('refreshLeaveHistoryBtn');
+            if(refreshLeaveHistoryBtn) {
+                refreshLeaveHistoryBtn.onclick = function() {
+                    loadLeaveHistory();
+                    alert('已从云端同步最新请假状态！');
+                };
+            }
 
             async function loadLeaveHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
                 var res = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).order('created_at', { ascending: false }).limit(10);
                 var data = res.data;
-                document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(function(i) {
-                    var cls = i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending';
-                    return '<li>' +
-                        '<span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span>' +
-                        '<span class="badge-' + cls + '">' + i.status + '</span>' +
-                    '</li>';
-                }).join('');
+                var listEl = document.getElementById('leaveHistoryList');
+                if(listEl) {
+                    listEl.innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(function(i) {
+                        var cls = i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending';
+                        return '<li>' +
+                            '<span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span>' +
+                            '<span class="badge-' + cls + '">' + i.status + '</span>' +
+                        '</li>';
+                    }).join('');
+                }
             }
 
-            // --- 管理员全功能加载 ---
             function loadAdminData() {
                 loadAdminReimbursements();
                 loadAdminUsers();
@@ -1085,19 +1130,177 @@
                 populateManualUserSelect();
             }
 
-            document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
+            var refreshReimburseBtn = document.getElementById('refreshReimburseBtn');
+            if(refreshReimburseBtn) refreshReimburseBtn.onclick = loadAdminReimbursements;
 
             async function loadAdminReimbursements() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
                 var data = res.data;
-                document.getElementById('adminReimburseList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="7">暂无记录</td></tr>' : data.map(function(i) {
-                    var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
-                    var statusCn = i.status==='Approved'?'已通过':i.status==='Rejected'?'已拒绝':'待处理';
-                    var preview = i.receipt_url ? '<img src="' + i.receipt_url + '" class="receipt-preview" onclick="openImagePreview(\'' + i.receipt_url + '\')" title="点击放大预览"/>' : '无';
-                    var dis = i.status!=='Pending'?'disabled':'';
-                    return '<tr>' +
-                        '<td><strong>' + i.applicant_name + '</strong></td>' +
-                        '<td>' + i.apply_date + '</td>' +
-                        '<td>' + i.amount + '</td>' +
-                        '<td>' + preview + '</td>' +
-                        '<td><span class="badge-' + cls + '">' + statusCn + '</span>
+                var listEl = document.getElementById('adminReimburseList');
+                if(listEl) {
+                    listEl.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="7">暂无记录</td></tr>' : data.map(function(i) {
+                        var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
+                        var statusCn = i.status==='Approved'?'已通过':i.status==='Rejected'?'已拒绝':'待处理';
+                        var preview = i.receipt_url ? '<img src="' + i.receipt_url + '" class="receipt-preview" onclick="openImagePreview(\'' + i.receipt_url + '\')" title="点击放大预览"/>' : '无';
+                        var dis = i.status!=='Pending'?'disabled':'';
+                        return '<tr>' +
+                            '<td><strong>' + i.applicant_name + '</strong></td>' +
+                            '<td>' + i.apply_date + '</td>' +
+                            '<td>' + i.amount + '</td>' +
+                            '<td>' + preview + '</td>' +
+                            '<td><span class="badge-' + cls + '">' + statusCn + '</span></td>' +
+                            '<td>' + (i.admin_remark || '-') + '</td>' +
+                            '<td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Approved\')">同意</button><button class="btn-danger" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Rejected\')">拒绝</button></td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            }
+
+            window.reviewReimburse = async function(id, status) {
+                var remark = prompt('审批备注 (可选):');
+                if (remark === null) return;
+                await sbClient.from('reimbursements').update({ status: status, admin_remark: remark }).eq('id', id);
+                loadAdminReimbursements();
+            };
+
+            var mapInstance = null, markerInstance = null, tempLat = COMPANY_LOCATION.latitude, tempLng = COMPANY_LOCATION.longitude;
+            var openMapPickerBtn = document.getElementById('openMapPickerBtn');
+            if(openMapPickerBtn) {
+                openMapPickerBtn.onclick = async function() {
+                    await fetchCloudLocation();
+                    tempLat = COMPANY_LOCATION.latitude; tempLng = COMPANY_LOCATION.longitude;
+                    document.getElementById('mapModal').style.display = 'flex';
+                    setTimeout(function() {
+                        if (!mapInstance && window.AMap) {
+                            mapInstance = new AMap.Map('amapContainer', { zoom: 16, center: [tempLng, tempLat] });
+                            markerInstance = new AMap.Marker({ position: [tempLng, tempLat], map: mapInstance });
+                            mapInstance.on('click', function(e) {
+                                tempLng = e.lnglat.getLng(); tempLat = e.lnglat.getLat();
+                                markerInstance.setPosition([tempLng, tempLat]);
+                                document.getElementById('selectedAddrTip').textContent = '已选坐标：经度 ' + tempLng.toFixed(6) + ', 纬度 ' + tempLat.toFixed(6);
+                            });
+                        } else if (mapInstance) {
+                            mapInstance.setCenter([tempLng, tempLat]);
+                            markerInstance.setPosition([tempLng, tempLat]);
+                        }
+                    }, 200);
+                };
+            }
+
+            var closeMapBtn = document.getElementById('closeMapBtn');
+            if(closeMapBtn) closeMapBtn.onclick = function() { document.getElementById('mapModal').style.display = 'none'; };
+            var confirmMapBtn = document.getElementById('confirmMapBtn');
+            if(confirmMapBtn) {
+                confirmMapBtn.onclick = async function() {
+                    COMPANY_LOCATION.latitude = tempLat; COMPANY_LOCATION.longitude = tempLng;
+                    await sbClient.from('announcements').delete().eq('title', '__SYS_LOCATION__');
+                    await sbClient.from('announcements').insert([{ title: '__SYS_LOCATION__', content: tempLat + ',' + tempLng }]);
+                    document.getElementById('displayLat').value = tempLat.toFixed(6);
+                    document.getElementById('displayLng').value = tempLng.toFixed(6);
+                    document.getElementById('mapModal').style.display = 'none';
+                    alert('📍 打卡定位基准已更新至云端');
+                };
+            }
+
+            async function populateManualUserSelect() {
+                var res = await sbClient.from('profiles').select('*');
+                var sel = document.getElementById('manualUserSelect');
+                if(sel && res.data) {
+                    sel.innerHTML = res.data.map(function(p) { return '<option value="' + (p.id || p.user_id) + '">' + (p.full_name || '员工') + '</option>'; }).join('');
+                }
+            }
+
+            var submitManualClockBtn = document.getElementById('submitManualClockBtn');
+            if(submitManualClockBtn) {
+                submitManualClockBtn.onclick = async function() {
+                    var userId = document.getElementById('manualUserSelect').value;
+                    var type = document.getElementById('manualClockType').value;
+                    var time = document.getElementById('manualClockTime').value;
+                    var reason = document.getElementById('manualReason').value.trim();
+                    if (!userId || !time || !reason) { alert('请填写完整补卡信息及原因！'); return; }
+                    await sbClient.from('attendance').insert([{ user_id: userId, clock_type: type + ' [补卡] - ' + reason, clock_in_time: new Date(time).toISOString() }]);
+                    alert('🎉 补卡记录已生成！');
+                    loadAdminAttendance(); analyzeAttendanceData();
+                };
+            }
+
+            var refreshAttendanceBtn = document.getElementById('refreshAttendanceBtn');
+            if(refreshAttendanceBtn) refreshAttendanceBtn.onclick = function() { loadAdminAttendance(); analyzeAttendanceData(); alert('已刷新'); };
+            var analyzeAttendanceBtn = document.getElementById('analyzeAttendanceBtn');
+            if(analyzeAttendanceBtn) analyzeAttendanceBtn.onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
+
+            async function analyzeAttendanceData() {
+                var aRes = await sbClient.from('attendance').select('*').limit(100);
+                var pRes = await sbClient.from('profiles').select('*');
+                var records = aRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; 
+                if (profiles) { profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; }); }
+                if(!records) return;
+
+                var normal = 0, abnormal = 0;
+                var listEl = document.getElementById('adminAttendanceAnalysisList');
+                if(listEl) {
+                    listEl.innerHTML = records.map(function(r) {
+                        var cType = formatClockType(r.clock_type);
+                        var isAbab = isAbnormalType(cType);
+                        if(isAbab) abnormal++; else normal++;
+                        return '<tr>' +
+                            '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
+                            '<td>' + cType + '</td>' +
+                            '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
+                            '<td><span class="' + (isAbab?'badge-abnormal':'badge-normal') + '">' + (isAbab?'异常':'正常') + '</span></td>' +
+                        '</tr>';
+                    }).join('');
+                }
+                var statTotal = document.getElementById('statTotal');
+                var statNormal = document.getElementById('statNormal');
+                var statLate = document.getElementById('statLate');
+                if(statTotal) statTotal.textContent = records.length;
+                if(statNormal) statNormal.textContent = normal;
+                if(statLate) statLate.textContent = abnormal;
+            }
+
+            var publishAnnouncementBtn = document.getElementById('publishAnnouncementBtn');
+            if(publishAnnouncementBtn) {
+                publishAnnouncementBtn.onclick = async function() {
+                    var title = document.getElementById('announcementTitleInput').value.trim();
+                    var content = document.getElementById('announcementContentInput').value.trim();
+                    if(!title || !content) { alert('标题和内容不能为空'); return; }
+                    await sbClient.from('announcements').insert([{ title: title, content: content }]);
+                    document.getElementById('announcementTitleInput').value = '';
+                    document.getElementById('announcementContentInput').value = '';
+                    loadAdminAnnouncements();
+                    alert('📢 公告发布成功！');
+                };
+            }
+
+            async function loadAdminAnnouncements() {
+                var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false });
+                var data = res.data;
+                var listEl = document.getElementById('adminAnnouncementList');
+                if(listEl) {
+                    listEl.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无公告</td></tr>' : data.map(function(i) {
+                        var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
+                        return '<tr>' +
+                            '<td>' +
+                                '<strong>' + i.title + '</strong> <span style="font-size:11px; color:#94a3b8; margin-left:8px;">(' + timeStr + ')</span><br>' +
+                                '<small style="color:#475569;">' + i.content + '</small>' +
+                            '</td>' +
+                            '<td><button class="btn-danger btn-sm" onclick="deleteAnnouncement(\'' + i.id + '\')">删除</button></td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            }
+            window.deleteAnnouncement = async function(id) { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
+
+            async function loadAdminUsers() {
+                var res = await sbClient.from('profiles').select('*');
+                var data = res.data;
+                var listEl = document.getElementById('adminUserList');
+                if(listEl) {
+                    listEl.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">无用户</td></tr>' : data.map(function(u) {
+                        var uid = u.id || u.user_id;
+                        var approved = u.is_approved || u.status === '已批准';
+                        var dis = approved ? 'disabled' : '';
+                        return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td><span class="' + (approved?'badge-approved':'badge-pending') + '">' + (approved?'已批准':'待审核') + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' +
