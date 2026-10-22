@@ -564,25 +564,32 @@
     <script>
         function openImagePreview(url) {
             if(!url) return;
-            document.getElementById('previewLargeImg').src = url;
-            document.getElementById('imagePreviewModal').style.display = 'flex';
+            var imgEl = document.getElementById('previewLargeImg');
+            var modalEl = document.getElementById('imagePreviewModal');
+            if(imgEl) imgEl.src = url;
+            if(modalEl) modalEl.style.display = 'flex';
         }
         function closeImagePreview() {
-            document.getElementById('imagePreviewModal').style.display = 'none';
+            var modalEl = document.getElementById('imagePreviewModal');
+            if(modalEl) modalEl.style.display = 'none';
         }
 
-        window.addEventListener('load', function() {
+        // 统一在页面加载完成后安全初始化所有事件监听
+        document.addEventListener("DOMContentLoaded", function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
 
             var sbClient;
-            if (window.supabase) {
-                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                    auth: { persistSession: true, autoRefreshToken: true }
-                });
-            } else {
-                alert("Supabase SDK 未成功加载，请检查网络联通性！");
-                return;
+            try {
+                if (window.supabase) {
+                    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                        auth: { persistSession: true, autoRefreshToken: true }
+                    });
+                } else {
+                    console.error("Supabase SDK 未成功加载");
+                }
+            } catch(e) {
+                console.error("初始化 Supabase 失败: ", e);
             }
 
             var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
@@ -618,31 +625,30 @@
                 if(section) section.style.display = 'block';
             }
 
-            document.getElementById('toRegisterBtn').onclick = function() { showSection(registerSection); };
-            document.getElementById('toLoginBtn').onclick = function() { showSection(loginSection); };
-            document.getElementById('backToLoginBtn').onclick = function() { showSection(loginSection); };
+            var toRegisterBtn = document.getElementById('toRegisterBtn');
+            var toLoginBtn = document.getElementById('toLoginBtn');
+            var backToLoginBtn = document.getElementById('backToLoginBtn');
 
-            // 登录核心逻辑（增加全面的异常兜底与按钮状态强制重置）
+            if(toRegisterBtn) toRegisterBtn.onclick = function() { showSection(registerSection); };
+            if(toLoginBtn) toLoginBtn.onclick = function() { showSection(loginSection); };
+            if(backToLoginBtn) backToLoginBtn.onclick = function() { showSection(loginSection); };
+
+            // 登录核心逻辑
             async function handleLogin() {
+                if(!sbClient) { alert("云端连接未就绪！"); return; }
                 var emailInput = document.getElementById('loginEmail');
                 var passInput = document.getElementById('loginPassword');
                 var btn = document.getElementById('loginBtn');
 
-                if (!emailInput || !passInput || !btn) {
-                    alert('页面元素未加载完全，请刷新重试！');
-                    return;
-                }
-
-                var email = emailInput.value.trim();
-                var password = passInput.value.trim();
+                var email = emailInput ? emailInput.value.trim() : '';
+                var password = passInput ? passInput.value.trim() : '';
 
                 if (!email || !password) { 
                     alert('请输入工作邮箱和密码！'); 
                     return; 
                 }
 
-                btn.disabled = true;
-                btn.textContent = '登录中...';
+                if(btn) { btn.disabled = true; btn.textContent = '登录中...'; }
 
                 try {
                     var res = await sbClient.auth.signInWithPassword({ email: email, password: password });
@@ -669,37 +675,40 @@
                         loadAdminData();
                     } else {
                         showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = '👋 欢迎，' + (profile.full_name || email);
-                        document.getElementById('empApplicantName').value = profile.full_name || '';
+                        var welcomeUser = document.getElementById('welcomeUser');
+                        var empApplicantName = document.getElementById('empApplicantName');
+                        if(welcomeUser) welcomeUser.textContent = '👋 欢迎，' + (profile.full_name || email);
+                        if(empApplicantName) empApplicantName.value = profile.full_name || '';
                         loadEmployeeData();
                     }
                 } catch (err) {
                     alert('登录发生异常: ' + (err.message || err));
                 } finally {
-                    // 无论成功或报错，务必恢复按钮状态，防止死锁卡死
-                    btn.disabled = false;
-                    btn.textContent = '登录系统';
+                    if(btn) { btn.disabled = false; btn.textContent = '登录系统'; }
                 }
             }
 
             var loginBtn = document.getElementById('loginBtn');
-            if(loginBtn) {
-                loginBtn.onclick = handleLogin;
-            }
+            if(loginBtn) loginBtn.onclick = handleLogin;
 
             async function handleRegister() {
-                var name = document.getElementById('regName').value.trim();
-                var email = document.getElementById('regEmail').value.trim();
-                var password = document.getElementById('regPassword').value.trim();
-                var confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+                if(!sbClient) { alert("云端连接未就绪！"); return; }
+                var nameInput = document.getElementById('regName');
+                var emailInput = document.getElementById('regEmail');
+                var passInput = document.getElementById('regPassword');
+                var confirmInput = document.getElementById('regConfirmPassword');
                 var btn = document.getElementById('registerBtn');
+
+                var name = nameInput ? nameInput.value.trim() : '';
+                var email = emailInput ? emailInput.value.trim() : '';
+                var password = passInput ? passInput.value.trim() : '';
+                var confirmPassword = confirmInput ? confirmInput.value.trim() : '';
 
                 if (!name || !email || !password) { alert('请完整填写基本信息！'); return; }
                 if (password !== confirmPassword) { alert('两次密码不一致！'); return; }
                 if (password.length < 6) { alert('密码至少 6 位！'); return; }
 
-                btn.disabled = true;
-                btn.textContent = '提交中...';
+                if(btn) { btn.disabled = true; btn.textContent = '提交中...'; }
 
                 try {
                     var res = await sbClient.auth.signUp({ email: email, password: password, options: { data: { full_name: name } } });
@@ -713,14 +722,14 @@
                 } catch (e) {
                     alert('注册异常: ' + e.message);
                 } finally {
-                    btn.disabled = false;
-                    btn.textContent = '提交注册申请';
+                    if(btn) { btn.disabled = false; btn.textContent = '提交注册申请'; }
                 }
             }
             var regBtn = document.getElementById('registerBtn');
             if(regBtn) regBtn.onclick = handleRegister;
 
             async function checkSession() {
+                if(!sbClient) return;
                 try {
                     var sRes = await sbClient.auth.getSession();
                     if (!sRes.data || !sRes.data.session || !sRes.data.session.user) { showSection(loginSection); return; }
@@ -736,8 +745,10 @@
                         loadAdminData();
                     } else {
                         showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = '👋 欢迎，' + profile.full_name;
-                        document.getElementById('empApplicantName').value = profile.full_name || '';
+                        var welcomeUser = document.getElementById('welcomeUser');
+                        var empApplicantName = document.getElementById('empApplicantName');
+                        if(welcomeUser) welcomeUser.textContent = '👋 欢迎，' + profile.full_name;
+                        if(empApplicantName) empApplicantName.value = profile.full_name || '';
                         loadEmployeeData();
                     }
                 } catch (e) {
@@ -747,8 +758,8 @@
             checkSession();
 
             var logoutBtn = document.getElementById('logoutBtn');
-            if(logoutBtn) logoutBtn.onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
             var adminLogoutBtn = document.getElementById('adminLogoutBtn');
+            if(logoutBtn) logoutBtn.onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
             if(adminLogoutBtn) adminLogoutBtn.onclick = async function() { await sbClient.auth.signOut(); location.reload(); };
 
             setInterval(function() {
@@ -1303,4 +1314,82 @@
                         var uid = u.id || u.user_id;
                         var approved = u.is_approved || u.status === '已批准';
                         var dis = approved ? 'disabled' : '';
-                        return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td><span class="' + (approved?'badge-approved':'badge-pending') + '">' + (approved?'已批准':'待审核') + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' +
+                        return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td><span class="' + (approved?'badge-approved':'badge-pending') + '">' + (approved?'已批准':'待审核') + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewUser(\'' + uid + '\', false)">拒绝</button></td></tr>';
+                    }).join('');
+                }
+            }
+            window.reviewUser = async function(id, isApproved) {
+                await sbClient.from('profiles').update({ is_approved: isApproved, status: isApproved ? '已批准' : '已拒绝' }).eq('id', id);
+                loadAdminUsers();
+            };
+
+            async function loadAdminLeaves() {
+                var lRes = await sbClient.from('leave_requests').select('*');
+                var pRes = await sbClient.from('profiles').select('*');
+                var leaves = lRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+
+                var listEl = document.getElementById('adminLeaveList');
+                if(listEl) {
+                    listEl.innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假</td></tr>' : leaves.map(function(l) {
+                        var dis = l.status!=='待审批'?'disabled':'';
+                        var cls = l.status==='已批准'?'badge-approved':l.status==='已拒绝'?'badge-rejected':'badge-pending';
+                        return '<tr><td>' + pMap[l.user_id] + ' (' + l.request_type + ')</td><td>' + (l.start_date?l.start_date.slice(0,10):'') + '~' + (l.end_date?l.end_date.slice(0,10):'') + '</td><td>' + l.reason + '</td><td><span class="' + cls + '">' + l.status + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', \'' + l.user_id + '\', \'' + l.request_type + '\', \'已批准\')">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', false, false, \'已拒绝\')">拒绝</button></td></tr>';
+                    }).join('');
+                }
+            }
+            window.reviewLeave = async function(id, uid, type, status) {
+                await sbClient.from('leave_requests').update({ status: status }).eq('id', id);
+                if(status === '已批准') await sbClient.from('attendance').insert([{ user_id: uid, clock_type: '请假(' + type + ')', clock_in_time: new Date().toISOString() }]);
+                loadAdminLeaves(); loadAdminAttendance();
+            };
+
+            async function loadAdminAttendance() {
+                var aRes = await sbClient.from('attendance').select('*').limit(50);
+                var pRes = await sbClient.from('profiles').select('*');
+                var records = aRes.data;
+                var profiles = pRes.data;
+                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+                var listEl = document.getElementById('adminAttendanceList');
+                if(listEl) {
+                    listEl.innerHTML = (!records || records.length === 0) ? '<tr><td colspan="4">暂无记录</td></tr>' : records.map(function(r) {
+                        var cType = formatClockType(r.clock_type);
+                        var isAb = isAbnormalType(cType);
+                        return '<tr>' +
+                            '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
+                            '<td>' + cType + '</td>' +
+                            '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
+                            '<td><span class="' + (isAb?'badge-abnormal':'badge-normal') + '">' + (isAb?'异常':'正常') + '</span></td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            }
+
+            var exportExcelBtn = document.getElementById('exportExcelBtn');
+            if(exportExcelBtn) {
+                exportExcelBtn.onclick = async function() {
+                    if (typeof XLSX === 'undefined') { alert("Excel 组件尚未完全加载，请稍候！"); return; }
+                    var aRes = await sbClient.from('attendance').select('*');
+                    var pRes = await sbClient.from('profiles').select('*');
+                    var records = aRes.data;
+                    var profiles = pRes.data;
+                    var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
+                    if(!records) return;
+                    var excelData = records.map(function(i) {
+                        return {
+                            '员工姓名': pMap[i.user_id] || '未知',
+                            '打卡时间': new Date(i.clock_in_time || i.clock_time).toLocaleString(),
+                            '打卡说明': formatClockType(i.clock_type)
+                        };
+                    });
+                    var ws = XLSX.utils.json_to_sheet(excelData);
+                    var wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "考勤统计");
+                    XLSX.writeFile(wb, '企业考勤报表_' + new Date().toISOString().slice(0,10) + '.xlsx');
+                };
+            }
+        });
+    </script>
+</body>
+</html>
