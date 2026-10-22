@@ -1,25 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#3b82f6">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="manifest" href="/manifest.json">
     <title>企业员工自助服务与管理系统</title>
-    <!-- 全局捕获页面未捕获的报错 -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            alert("⚠️ 页面JS执行异常:\n" + msg + "\n行号: " + line);
-            return false;
-        };
-    </script>
-    <!-- 引入 SheetJS 用于导出 Excel -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- 引入 Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- 引入高德地图 JS API -->
-    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
     
+    <!-- 1. 优先加载关键 SDK，确保后续代码调用时 SDK 已ready -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <style>
         :root {
             --primary-color: #3b82f6;
@@ -527,17 +519,18 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        // 确保 Supabase 和全局事件完全加载
+        window.addEventListener('load', function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
 
             var sbClient;
-            try {
+            if (window.supabase) {
                 sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                     auth: { persistSession: true, autoRefreshToken: true }
                 });
-            } catch (err) {
-                alert("Supabase客户端初始化错误: " + err.message);
+            } else {
+                alert("Supabase SDK 未成功加载，请检查网络联通性！");
                 return;
             }
 
@@ -570,7 +563,7 @@
                 var password = document.getElementById('loginPassword').value.trim();
                 var btn = document.getElementById('loginBtn');
 
-                if (!email || !password) { alert('请输入邮箱和密码！'); return; }
+                if (!email || !password) { alert('请输入工作邮箱和密码！'); return; }
 
                 btn.disabled = true;
                 btn.textContent = '登录中...';
@@ -602,7 +595,7 @@
                         loadEmployeeData();
                     }
                 } catch (err) {
-                    alert('登录异常: ' + (err.message || err));
+                    alert('登录发生异常: ' + (err.message || err));
                 } finally {
                     btn.disabled = false;
                     btn.textContent = '登录系统';
