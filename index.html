@@ -165,10 +165,10 @@
         .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
         .badge-leave { color: #2563eb; font-weight: bold; background: #dbeafe; padding: 2px 6px; border-radius: 4px; }
 
-        ul { padding-left: 0; list-style: none; max-height: 180px; overflow-y: auto; margin: 0; }
+        ul { padding-left: 0; list-style: none; max-height: 220px; overflow-y: auto; margin: 0; }
         li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         
-        .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px; }
+        .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 10px; border-radius: 6px; font-size: 14px; }
         .holiday-banner { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 16px; display: none; }
         
         .action-btns button { width: auto; padding: 4px 10px; font-size: 12px; margin-right: 4px; box-shadow: none; }
@@ -185,21 +185,23 @@
 
         .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; }
 
-        #mapModal {
+        /* 弹窗遮罩 */
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
-        .map-modal-content {
+        .modal-card {
             background: white;
             width: 90%;
-            max-width: 600px;
+            max-width: 550px;
             border-radius: 16px;
-            padding: 20px;
+            padding: 22px;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
         }
         #amapContainer {
@@ -264,7 +266,6 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <!-- 已去掉括号内的 (550米范围) -->
                 <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
@@ -298,7 +299,8 @@
                             <input type="date" id="empApplyDate" required>
                         </div>
                         <div class="input-group">
-                            <label>报销金额 ($ / ¥) *</label>
+                            <!-- 去掉美金符号 -->
+                            <label>报销金额 *</label>
                             <input type="number" step="0.01" id="empReimburseAmount" placeholder="0.00" required>
                         </div>
                     </div>
@@ -505,9 +507,32 @@
         </div>
     </div>
 
+    <!-- 员工报销记录详情弹窗 -->
+    <div id="reimburseDetailModal" class="modal-overlay">
+        <div class="modal-card">
+            <h3 style="margin:0 0 16px 0; border-bottom:1px solid var(--border-color); padding-bottom:10px;">🧾 报销申请明细</h3>
+            <div style="font-size: 14px; line-height: 1.8; color: var(--text-main);">
+                <p style="margin:4px 0;"><strong>申请人：</strong><span id="detailApplicant">-</span></p>
+                <p style="margin:4px 0;"><strong>申请日期：</strong><span id="detailDate">-</span></p>
+                <p style="margin:4px 0;"><strong>报销金额：</strong><span id="detailAmount" style="color: #7c3aed; font-weight: bold; font-size:16px;">-</span></p>
+                <p style="margin:4px 0;"><strong>当前状态：</strong><span id="detailStatus">-</span></p>
+                <p style="margin:4px 0;"><strong>审批备注：</strong><span id="detailRemark" style="color: var(--text-secondary);">-</span></p>
+                <div style="margin-top:12px;">
+                    <strong style="display:block; margin-bottom:6px;">报销凭证图片：</strong>
+                    <div id="detailReceiptContainer" style="text-align: center; background:#f8fafc; padding:10px; border-radius:10px; border: 1px solid var(--border-color);">
+                        <img id="detailReceiptImg" src="" alt="凭证" style="max-width:100%; max-height:260px; object-fit:contain; border-radius:6px;">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 18px;">
+                <button id="closeReimburseDetailBtn" type="button" style="background: #64748b;">关闭详情</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 高德地图选点弹窗 -->
-    <div id="mapModal">
-        <div class="map-modal-content">
+    <div id="mapModal" class="modal-overlay">
+        <div class="modal-card" style="max-width:600px;">
             <h3 style="margin:0 0 10px 0; border:none; padding:0;">📍 请在地图上点击选择公司打卡位置</h3>
             <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">点击地图任意位置锁定坐标。</p>
             <div id="amapContainer"></div>
@@ -535,6 +560,7 @@
             }
 
             var COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
+            var empReimbursementsCache = []; // 缓存当前员工报销数据
 
             var loginSection = document.getElementById('loginSection');
             var registerSection = document.getElementById('registerSection');
@@ -544,7 +570,6 @@
 
             var currentClockState = 'in';
 
-            // 辅助转换函数：将原本可能存储在数据库的英文类型转为优雅中文
             function formatClockType(type) {
                 if (!type) return '考勤记录';
                 if (type === 'in' || type === 'clock-in') return '上班打卡';
@@ -552,7 +577,6 @@
                 return type;
             }
 
-            // 辅助判断函数：是否包含异常/迟到/超出范围/补卡
             function isAbnormalType(type) {
                 if (!type) return false;
                 var str = String(type);
@@ -730,7 +754,14 @@
                 var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false }).limit(3);
                 var data = res.data;
                 document.getElementById('announcementList').innerHTML = (!data || data.length === 0) ? '<p style="color:#64748b; font-size:13px; margin:0;">暂无公告</p>' : data.map(function(i) {
-                    return '<div class="announcement-item"><strong>' + i.title + '</strong><br><span style="font-size:13px; color:#475569;">' + i.content + '</span></div>';
+                    var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
+                    return '<div class="announcement-item">' +
+                        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+                            '<strong style="color:#b45309;">' + i.title + '</strong>' +
+                            '<span style="font-size:11px; color:#94a3b8;">⏱️ ' + timeStr + '</span>' +
+                        '</div>' +
+                        '<span style="font-size:13px; color:#475569; display:block; line-height:1.5;">' + i.content + '</span>' +
+                    '</div>';
                 }).join('');
             }
 
@@ -819,7 +850,6 @@
                 });
             };
 
-            // 加载个人历史记录：改in/out为中文，正常绿色、异常红色
             async function loadHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
@@ -840,7 +870,7 @@
                 }).join('');
             }
 
-            // 员工报销
+            // 员工提交报销
             document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
                 e.preventDefault();
                 var btn = document.getElementById('empSubmitReimburseBtn');
@@ -874,14 +904,55 @@
                 }
             };
 
+            // 加载个人报销历史（已去掉美金符号，增加查看详情按钮）
             async function loadEmpReimburseHistory() {
-                var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(5);
-                var data = res.data;
-                document.getElementById('empReimburseHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无报销记录</li>' : data.map(function(i) {
+                var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(10);
+                empReimbursementsCache = res.data || [];
+                document.getElementById('empReimburseHistoryList').innerHTML = (empReimbursementsCache.length === 0) ? '<li>暂无报销记录</li>' : empReimbursementsCache.map(function(i, idx) {
                     var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
-                    return '<li><span>🧾 [' + i.apply_date + '] $' + i.amount + '</span><span class="badge-' + cls + '">' + (i.status==='Approved'?'已同意':i.status==='Rejected'?'已拒绝':'审核中') + '</span></li>';
+                    var statusCn = i.status==='Approved'?'已同意':i.status==='Rejected'?'已拒绝':'审核中';
+                    return '<li>' +
+                        '<span>🧾 [' + i.apply_date + '] ' + i.amount + '</span>' +
+                        '<span style="display:flex; align-items:center; gap:8px;">' +
+                            '<span class="badge-' + cls + '">' + statusCn + '</span>' +
+                            '<button class="btn-sm" style="background:#7c3aed; color:white; padding:2px 8px; font-size:11px;" onclick="viewReimburseDetail(' + idx + ')">🔍 详情</button>' +
+                        '</span>' +
+                    '</li>';
                 }).join('');
             }
+
+            // 员工端查看报销详情弹窗逻辑
+            window.viewReimburseDetail = function(idx) {
+                var item = empReimbursementsCache[idx];
+                if (!item) return;
+                document.getElementById('detailApplicant').textContent = item.applicant_name || '-';
+                document.getElementById('detailDate').textContent = item.apply_date || '-';
+                // 纯数值金额，不加美金符号
+                document.getElementById('detailAmount').textContent = item.amount;
+                
+                var statusCn = item.status==='Approved'?'✅ 已通过 / 已准许':item.status==='Rejected'?'❌ 已拒绝 / 未通过':'⏳ 正在审核中';
+                var statusColor = item.status==='Approved'?'#16a34a':item.status==='Rejected'?'#dc2626':'#d97706';
+                var detailStatusEl = document.getElementById('detailStatus');
+                detailStatusEl.textContent = statusCn;
+                detailStatusEl.style.color = statusColor;
+                detailStatusEl.style.fontWeight = 'bold';
+
+                document.getElementById('detailRemark').textContent = item.admin_remark || '无备注';
+
+                var imgEl = document.getElementById('detailReceiptImg');
+                if (item.receipt_url) {
+                    imgEl.src = item.receipt_url;
+                    imgEl.style.display = 'block';
+                } else {
+                    imgEl.style.display = 'none';
+                }
+
+                document.getElementById('reimburseDetailModal').style.display = 'flex';
+            };
+
+            document.getElementById('closeReimburseDetailBtn').onclick = function() {
+                document.getElementById('reimburseDetailModal').style.display = 'none';
+            };
 
             // 请假
             document.getElementById('submitLeaveBtn').onclick = async function() {
@@ -921,6 +992,7 @@
 
             document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
 
+            // 管理员后台报销审批列表（去掉美金符号）
             async function loadAdminReimbursements() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
                 var data = res.data;
@@ -932,7 +1004,7 @@
                     return '<tr>' +
                         '<td><strong>' + i.applicant_name + '</strong></td>' +
                         '<td>' + i.apply_date + '</td>' +
-                        '<td>$' + i.amount + '</td>' +
+                        '<td>' + i.amount + '</td>' + // 已去掉美金符号
                         '<td>' + preview + '</td>' +
                         '<td><span class="badge-' + cls + '">' + statusCn + '</span></td>' +
                         '<td>' + (i.admin_remark || '-') + '</td>' +
@@ -1002,7 +1074,6 @@
             document.getElementById('refreshAttendanceBtn').onclick = function() { loadAdminAttendance(); analyzeAttendanceData(); alert('已刷新'); };
             document.getElementById('analyzeAttendanceBtn').onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
 
-            // 智能考勤分析：正常绿、异常红
             async function analyzeAttendanceData() {
                 var aRes = await sbClient.from('attendance').select('*').limit(100);
                 var pRes = await sbClient.from('profiles').select('*');
@@ -1044,7 +1115,14 @@
                 var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false });
                 var data = res.data;
                 document.getElementById('adminAnnouncementList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无公告</td></tr>' : data.map(function(i) {
-                    return '<tr><td><strong>' + i.title + '</strong><br><small>' + i.content + '</small></td><td><button class="btn-danger btn-sm" onclick="deleteAnnouncement(\'' + i.id + '\')">删除</button></td></tr>';
+                    var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
+                    return '<tr>' +
+                        '<td>' +
+                            '<strong>' + i.title + '</strong> <span style="font-size:11px; color:#94a3b8; margin-left:8px;">(' + timeStr + ')</span><br>' +
+                            '<small style="color:#475569;">' + i.content + '</small>' +
+                        '</td>' +
+                        '<td><button class="btn-danger btn-sm" onclick="deleteAnnouncement(\'' + i.id + '\')">删除</button></td>' +
+                    '</tr>';
                 }).join('');
             }
             window.deleteAnnouncement = async function(id) { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
@@ -1083,7 +1161,6 @@
                 loadAdminLeaves(); loadAdminAttendance();
             };
 
-            // 全公司监控列表：翻译in/out并标红标绿
             async function loadAdminAttendance() {
                 var aRes = await sbClient.from('attendance').select('*').limit(50);
                 var pRes = await sbClient.from('profiles').select('*');
