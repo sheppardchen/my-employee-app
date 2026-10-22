@@ -186,7 +186,6 @@
         .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: transform 0.2s; }
         .receipt-preview:hover { transform: scale(1.05); }
 
-        /* 模态框遮罩 */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -507,7 +506,7 @@
         </div>
     </div>
 
-    <!-- 管理员图片大图预览弹窗（带明确关闭按钮） -->
+    <!-- 管理员图片大图预览弹窗 -->
     <div id="imagePreviewModal" class="modal-overlay" onclick="closeImagePreview()">
         <div class="modal-card" style="max-width: 600px; text-align: center; background: #0f172a; padding: 16px;" onclick="event.stopPropagation()">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: white;">
@@ -890,19 +889,22 @@
                 }).join('');
             }
 
-            // 员工提交报销（具备防重复提交锁与内容唯一性校验）
+            // 员工提交报销申请（带清空表单与双重防重校验）
             document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
                 e.preventDefault();
                 var btn = document.getElementById('empSubmitReimburseBtn');
                 var tip = document.getElementById('empReimburseResult');
                 var name = document.getElementById('empApplicantName').value.trim();
                 var date = document.getElementById('empApplyDate').value;
-                var amount = parseFloat(document.getElementById('empReimburseAmount').value);
+                var amountStr = document.getElementById('empReimburseAmount').value;
                 var fileInput = document.getElementById('empReceiptFile');
 
-                if (!fileInput.files || fileInput.files.length === 0) { alert('请选择凭证！'); return; }
+                if (!name || !date || !amountStr || !fileInput.files || fileInput.files.length === 0) {
+                    alert('请完整填写报销信息并选择凭证！');
+                    return;
+                }
+                var amount = parseFloat(amountStr);
 
-                // 防重复提交：如果正在提交中，直接拦截
                 if (btn.disabled) return;
                 btn.disabled = true; 
                 btn.textContent = '正在提交...';
@@ -910,8 +912,7 @@
                 tip.textContent = '⏳ 正在校验并上传报销申请...';
 
                 try {
-                    // 查询最近5分钟内是否已经提交过相同金额和日期的报销，避免瞬间重复点击
-                    var uRes = await sbClient.auth.getUser();
+                    // 云端重复提交检查
                     var checkDup = await sbClient.from('reimbursements').select('*').eq('applicant_name', name).eq('apply_date', date).eq('amount', amount).limit(1);
                     if (checkDup.data && checkDup.data.length > 0) {
                         tip.style.color = '#dc2626'; 
@@ -931,13 +932,15 @@
                     if (dbRes.error) throw dbRes.error;
 
                     tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！';
-                    document.getElementById('employeeReimburseForm').reset();
+                    
+                    // 提交成功后清空表单（金额和文件置空，防止空白数据继续提交）
+                    document.getElementById('empReimburseAmount').value = '';
+                    document.getElementById('empReceiptFile').value = '';
                     setupLeaveDateConstraints();
                     loadEmpReimburseHistory();
                 } catch (err) {
                     tip.style.color = '#dc2626'; tip.textContent = '提交失败: ' + err.message;
                 } finally {
-                    // 提交完成后恢复按钮可用状态
                     btn.disabled = false; 
                     btn.textContent = '📤 提交报销申请';
                 }
@@ -990,7 +993,7 @@
                 document.getElementById('reimburseDetailModal').style.display = 'none';
             };
 
-            // 请假申请（具备防重复提交锁与同一时间段内容去重校验）
+            // 请假申请提交（提交成功后强制清空表单变为期/事由空白，空白无法二次提交）
             document.getElementById('submitLeaveBtn').onclick = async function() {
                 var btn = document.getElementById('submitLeaveBtn');
                 var uRes = await sbClient.auth.getUser();
@@ -1002,7 +1005,11 @@
                 var reason = document.getElementById('leaveReason').value.trim();
                 var tip = document.getElementById('leaveResult');
                 
-                if (!start || !end) { alert('请选择起止日期！'); return; }
+                // 空白校验：若未选择日期，直接拦截
+                if (!start || !end) {
+                    alert('请选择请假起止日期！');
+                    return;
+                }
 
                 // 按钮防重复加锁
                 if (btn.disabled) return;
@@ -1012,7 +1019,7 @@
                 tip.textContent = '⏳ 校验并提交中...';
 
                 try {
-                    // 云端查重：检查该用户是否存在相同起止日期且未被拒绝的请假记录，防止重复提交
+                    // 云端查重校验
                     var dupCheck = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).eq('request_type', type).eq('start_date', start + 'T00:00:00').eq('end_date', end + 'T23:59:59');
                     if (dupCheck.data && dupCheck.data.length > 0) {
                         tip.style.color = '#dc2626';
@@ -1027,7 +1034,13 @@
                     
                     tip.style.color = '#10b981'; 
                     tip.textContent = '✅ 请假申请已成功提交！';
+                    
+                    // 【核心修改】提交成功后，立即将表单输入框清空恢复为“空白”，使空白状态下无法再次直接点击提交
+                    document.getElementById('startDate').value = '';
+                    document.getElementById('endDate').value = '';
                     document.getElementById('leaveReason').value = '';
+                    setupLeaveDateConstraints(); // 重新初始化日期边界
+                    
                     loadLeaveHistory();
                 } catch(e) {
                     tip.style.color = '#dc2626';
@@ -1062,7 +1075,6 @@
 
             document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
 
-            // 管理员后台报销审批列表
             async function loadAdminReimbursements() {
                 var res = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
                 var data = res.data;
