@@ -317,7 +317,10 @@
 
             <!-- 请假申请模块 -->
             <div class="card">
-                <h3>📝 提交请假申请</h3>
+                <h3>
+                    <span>📝 提交请假申请</span>
+                    <button id="refreshLeaveHistoryBtn" type="button" class="btn-sm" style="background:#2563eb; color:white;">🔄 刷新审批状态</button>
+                </h3>
                 <div class="input-group">
                     <label>请假类型</label>
                     <select id="leaveType">
@@ -869,12 +872,20 @@
                 });
             };
 
+            // 核心修改：客户端考勤打卡记录过滤，不展示请假记录
             async function loadHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
-                var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).limit(10);
+                var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).limit(20);
                 var data = res.data;
-                document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(function(i) {
+                
+                // 过滤掉包含“请假”字样的特殊记录
+                var filteredData = data ? data.filter(function(i) {
+                    var typeStr = String(i.clock_type || '');
+                    return typeStr.indexOf('请假') === -1;
+                }) : [];
+
+                document.getElementById('historyList').innerHTML = (filteredData.length === 0) ? '<li>暂无打卡记录</li>' : filteredData.map(function(i) {
                     var cType = formatClockType(i.clock_type);
                     var isAb = isAbnormalType(cType);
                     var badgeClass = isAb ? 'badge-abnormal' : 'badge-normal';
@@ -889,7 +900,6 @@
                 }).join('');
             }
 
-            // 员工提交报销申请（带清空表单与双重防重校验）
             document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
                 e.preventDefault();
                 var btn = document.getElementById('empSubmitReimburseBtn');
@@ -912,7 +922,6 @@
                 tip.textContent = '⏳ 正在校验并上传报销申请...';
 
                 try {
-                    // 云端重复提交检查
                     var checkDup = await sbClient.from('reimbursements').select('*').eq('applicant_name', name).eq('apply_date', date).eq('amount', amount).limit(1);
                     if (checkDup.data && checkDup.data.length > 0) {
                         tip.style.color = '#dc2626'; 
@@ -933,7 +942,6 @@
 
                     tip.style.color = '#10b981'; tip.textContent = '🎉 报销提交成功！';
                     
-                    // 提交成功后清空表单（金额和文件置空，防止空白数据继续提交）
                     document.getElementById('empReimburseAmount').value = '';
                     document.getElementById('empReceiptFile').value = '';
                     setupLeaveDateConstraints();
@@ -993,7 +1001,7 @@
                 document.getElementById('reimburseDetailModal').style.display = 'none';
             };
 
-            // 请假申请提交（提交成功后强制清空表单变为期/事由空白，空白无法二次提交）
+            // 员工请假申请提交
             document.getElementById('submitLeaveBtn').onclick = async function() {
                 var btn = document.getElementById('submitLeaveBtn');
                 var uRes = await sbClient.auth.getUser();
@@ -1005,13 +1013,11 @@
                 var reason = document.getElementById('leaveReason').value.trim();
                 var tip = document.getElementById('leaveResult');
                 
-                // 空白校验：若未选择日期，直接拦截
                 if (!start || !end) {
                     alert('请选择请假起止日期！');
                     return;
                 }
 
-                // 按钮防重复加锁
                 if (btn.disabled) return;
                 btn.disabled = true;
                 btn.textContent = '正在提交申请...';
@@ -1019,7 +1025,6 @@
                 tip.textContent = '⏳ 校验并提交中...';
 
                 try {
-                    // 云端查重校验
                     var dupCheck = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).eq('request_type', type).eq('start_date', start + 'T00:00:00').eq('end_date', end + 'T23:59:59');
                     if (dupCheck.data && dupCheck.data.length > 0) {
                         tip.style.color = '#dc2626';
@@ -1035,11 +1040,10 @@
                     tip.style.color = '#10b981'; 
                     tip.textContent = '✅ 请假申请已成功提交！';
                     
-                    // 【核心修改】提交成功后，立即将表单输入框清空恢复为“空白”，使空白状态下无法再次直接点击提交
                     document.getElementById('startDate').value = '';
                     document.getElementById('endDate').value = '';
                     document.getElementById('leaveReason').value = '';
-                    setupLeaveDateConstraints(); // 重新初始化日期边界
+                    setupLeaveDateConstraints();
                     
                     loadLeaveHistory();
                 } catch(e) {
@@ -1051,14 +1055,22 @@
                 }
             };
 
+            document.getElementById('refreshLeaveHistoryBtn').onclick = function() {
+                loadLeaveHistory();
+                alert('已从云端同步最新请假状态！');
+            };
+
             async function loadLeaveHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
-                var res = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).limit(5);
+                var res = await sbClient.from('leave_requests').select('*').eq('user_id', uRes.data.user.id).order('created_at', { ascending: false }).limit(10);
                 var data = res.data;
                 document.getElementById('leaveHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无请假记录</li>' : data.map(function(i) {
                     var cls = i.status==='已批准'?'approved':i.status==='已拒绝'?'rejected':'pending';
-                    return '<li><span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span><span class="badge-' + cls + '">' + i.status + '</span></li>';
+                    return '<li>' +
+                        '<span>📌 [' + i.request_type + '] ' + (i.start_date ? i.start_date.slice(0,10) : '') + '起</span>' +
+                        '<span class="badge-' + cls + '">' + i.status + '</span>' +
+                    '</li>';
                 }).join('');
             }
 
@@ -1088,199 +1100,4 @@
                         '<td>' + i.apply_date + '</td>' +
                         '<td>' + i.amount + '</td>' +
                         '<td>' + preview + '</td>' +
-                        '<td><span class="badge-' + cls + '">' + statusCn + '</span></td>' +
-                        '<td>' + (i.admin_remark || '-') + '</td>' +
-                        '<td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Approved\')">同意</button><button class="btn-danger" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Rejected\')">拒绝</button></td>' +
-                    '</tr>';
-                }).join('');
-            }
-
-            window.reviewReimburse = async function(id, status) {
-                var remark = prompt('审批备注 (可选):');
-                if (remark === null) return;
-                await sbClient.from('reimbursements').update({ status: status, admin_remark: remark }).eq('id', id);
-                loadAdminReimbursements();
-            };
-
-            var mapInstance = null, markerInstance = null, tempLat = COMPANY_LOCATION.latitude, tempLng = COMPANY_LOCATION.longitude;
-            document.getElementById('openMapPickerBtn').onclick = async function() {
-                await fetchCloudLocation();
-                tempLat = COMPANY_LOCATION.latitude; tempLng = COMPANY_LOCATION.longitude;
-                document.getElementById('mapModal').style.display = 'flex';
-                setTimeout(function() {
-                    if (!mapInstance && window.AMap) {
-                        mapInstance = new AMap.Map('amapContainer', { zoom: 16, center: [tempLng, tempLat] });
-                        markerInstance = new AMap.Marker({ position: [tempLng, tempLat], map: mapInstance });
-                        mapInstance.on('click', function(e) {
-                            tempLng = e.lnglat.getLng(); tempLat = e.lnglat.getLat();
-                            markerInstance.setPosition([tempLng, tempLat]);
-                            document.getElementById('selectedAddrTip').textContent = '已选坐标：经度 ' + tempLng.toFixed(6) + ', 纬度 ' + tempLat.toFixed(6);
-                        });
-                    } else if (mapInstance) {
-                        mapInstance.setCenter([tempLng, tempLat]);
-                        markerInstance.setPosition([tempLng, tempLat]);
-                    }
-                }, 200);
-            };
-            document.getElementById('closeMapBtn').onclick = function() { document.getElementById('mapModal').style.display = 'none'; };
-            document.getElementById('confirmMapBtn').onclick = async function() {
-                COMPANY_LOCATION.latitude = tempLat; COMPANY_LOCATION.longitude = tempLng;
-                await sbClient.from('announcements').delete().eq('title', '__SYS_LOCATION__');
-                await sbClient.from('announcements').insert([{ title: '__SYS_LOCATION__', content: tempLat + ',' + tempLng }]);
-                document.getElementById('displayLat').value = tempLat.toFixed(6);
-                document.getElementById('displayLng').value = tempLng.toFixed(6);
-                document.getElementById('mapModal').style.display = 'none';
-                alert('📍 打卡定位基准已更新至云端');
-            };
-
-            async function populateManualUserSelect() {
-                var res = await sbClient.from('profiles').select('*');
-                var sel = document.getElementById('manualUserSelect');
-                if(sel && res.data) {
-                    sel.innerHTML = res.data.map(function(p) { return '<option value="' + (p.id || p.user_id) + '">' + (p.full_name || '员工') + '</option>'; }).join('');
-                }
-            }
-
-            document.getElementById('submitManualClockBtn').onclick = async function() {
-                var userId = document.getElementById('manualUserSelect').value;
-                var type = document.getElementById('manualClockType').value;
-                var time = document.getElementById('manualClockTime').value;
-                var reason = document.getElementById('manualReason').value.trim();
-                if (!userId || !time || !reason) { alert('请填写完整补卡信息及原因！'); return; }
-                await sbClient.from('attendance').insert([{ user_id: userId, clock_type: type + ' [补卡] - ' + reason, clock_in_time: new Date(time).toISOString() }]);
-                alert('🎉 补卡记录已生成！');
-                loadAdminAttendance(); analyzeAttendanceData();
-            };
-
-            document.getElementById('refreshAttendanceBtn').onclick = function() { loadAdminAttendance(); analyzeAttendanceData(); alert('已刷新'); };
-            document.getElementById('analyzeAttendanceBtn').onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
-
-            async function analyzeAttendanceData() {
-                var aRes = await sbClient.from('attendance').select('*').limit(100);
-                var pRes = await sbClient.from('profiles').select('*');
-                var records = aRes.data;
-                var profiles = pRes.data;
-                var pMap = {}; 
-                if (profiles) { profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; }); }
-                if(!records) return;
-
-                var normal = 0, abnormal = 0;
-                document.getElementById('adminAttendanceAnalysisList').innerHTML = records.map(function(r) {
-                    var cType = formatClockType(r.clock_type);
-                    var isAbab = isAbnormalType(cType);
-                    if(isAbab) abnormal++; else normal++;
-                    return '<tr>' +
-                        '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
-                        '<td>' + cType + '</td>' +
-                        '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
-                        '<td><span class="' + (isAbab?'badge-abnormal':'badge-normal') + '">' + (isAbab?'异常':'正常') + '</span></td>' +
-                    '</tr>';
-                }).join('');
-                document.getElementById('statTotal').textContent = records.length;
-                document.getElementById('statNormal').textContent = normal;
-                document.getElementById('statLate').textContent = abnormal;
-            }
-
-            document.getElementById('publishAnnouncementBtn').onclick = async function() {
-                var title = document.getElementById('announcementTitleInput').value.trim();
-                var content = document.getElementById('announcementContentInput').value.trim();
-                if(!title || !content) { alert('标题和内容不能为空'); return; }
-                await sbClient.from('announcements').insert([{ title: title, content: content }]);
-                document.getElementById('announcementTitleInput').value = '';
-                document.getElementById('announcementContentInput').value = '';
-                loadAdminAnnouncements();
-                alert('📢 公告发布成功！');
-            };
-
-            async function loadAdminAnnouncements() {
-                var res = await sbClient.from('announcements').select('*').neq('title', '__SYS_LOCATION__').order('created_at', { ascending: false });
-                var data = res.data;
-                document.getElementById('adminAnnouncementList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="2">无公告</td></tr>' : data.map(function(i) {
-                    var timeStr = i.created_at ? new Date(i.created_at).toLocaleString() : '刚刚';
-                    return '<tr>' +
-                        '<td>' +
-                            '<strong>' + i.title + '</strong> <span style="font-size:11px; color:#94a3b8; margin-left:8px;">(' + timeStr + ')</span><br>' +
-                            '<small style="color:#475569;">' + i.content + '</small>' +
-                        '</td>' +
-                        '<td><button class="btn-danger btn-sm" onclick="deleteAnnouncement(\'' + i.id + '\')">删除</button></td>' +
-                    '</tr>';
-                }).join('');
-            }
-            window.deleteAnnouncement = async function(id) { await sbClient.from('announcements').delete().eq('id', id); loadAdminAnnouncements(); };
-
-            async function loadAdminUsers() {
-                var res = await sbClient.from('profiles').select('*');
-                var data = res.data;
-                document.getElementById('adminUserList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="4">无用户</td></tr>' : data.map(function(u) {
-                    var uid = u.id || u.user_id;
-                    var approved = u.is_approved || u.status === '已批准';
-                    var dis = approved ? 'disabled' : '';
-                    return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td><span class="' + (approved?'badge-approved':'badge-pending') + '">' + (approved?'已批准':'待审核') + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewUser(\'' + uid + '\', false)">拒绝</button></td></tr>';
-                }).join('');
-            }
-            window.reviewUser = async function(id, isApproved) {
-                await sbClient.from('profiles').update({ is_approved: isApproved, status: isApproved ? '已批准' : '已拒绝' }).eq('id', id);
-                loadAdminUsers();
-            };
-
-            async function loadAdminLeaves() {
-                var lRes = await sbClient.from('leave_requests').select('*');
-                var pRes = await sbClient.from('profiles').select('*');
-                var leaves = lRes.data;
-                var profiles = pRes.data;
-                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
-
-                document.getElementById('adminLeaveList').innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假</td></tr>' : leaves.map(function(l) {
-                    var dis = l.status!=='待审批'?'disabled':'';
-                    var cls = l.status==='已批准'?'badge-approved':l.status==='已拒绝'?'badge-rejected':'badge-pending';
-                    return '<tr><td>' + pMap[l.user_id] + ' (' + l.request_type + ')</td><td>' + (l.start_date?l.start_date.slice(0,10):'') + '~' + (l.end_date?l.end_date.slice(0,10):'') + '</td><td>' + l.reason + '</td><td><span class="' + cls + '">' + l.status + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', \'' + l.user_id + '\', \'' + l.request_type + '\', \'已批准\')">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', false, false, \'已拒绝\')">拒绝</button></td></tr>';
-                }).join('');
-            }
-            window.reviewLeave = async function(id, uid, type, status) {
-                await sbClient.from('leave_requests').update({ status: status }).eq('id', id);
-                if(status === '已批准') await sbClient.from('attendance').insert([{ user_id: uid, clock_type: '请假(' + type + ')', clock_in_time: new Date().toISOString() }]);
-                loadAdminLeaves(); loadAdminAttendance();
-            };
-
-            async function loadAdminAttendance() {
-                var aRes = await sbClient.from('attendance').select('*').limit(50);
-                var pRes = await sbClient.from('profiles').select('*');
-                var records = aRes.data;
-                var profiles = pRes.data;
-                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
-                document.getElementById('adminAttendanceList').innerHTML = (!records || records.length === 0) ? '<tr><td colspan="4">暂无记录</td></tr>' : records.map(function(r) {
-                    var cType = formatClockType(r.clock_type);
-                    var isAb = isAbnormalType(cType);
-                    return '<tr>' +
-                        '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
-                        '<td>' + cType + '</td>' +
-                        '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
-                        '<td><span class="' + (isAb?'badge-abnormal':'badge-normal') + '">' + (isAb?'异常':'正常') + '</span></td>' +
-                    '</tr>';
-                }).join('');
-            }
-
-            document.getElementById('exportExcelBtn').onclick = async function() {
-                if (typeof XLSX === 'undefined') { alert("Excel 组件尚未完全加载，请稍候！"); return; }
-                var aRes = await sbClient.from('attendance').select('*');
-                var pRes = await sbClient.from('profiles').select('*');
-                var records = aRes.data;
-                var profiles = pRes.data;
-                var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
-                if(!records) return;
-                var excelData = records.map(function(i) {
-                    return {
-                        '员工姓名': pMap[i.user_id] || '未知',
-                        '打卡时间': new Date(i.clock_in_time || i.clock_time).toLocaleString(),
-                        '打卡说明': formatClockType(i.clock_type)
-                    };
-                });
-                var ws = XLSX.utils.json_to_sheet(excelData);
-                var wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "考勤统计");
-                XLSX.writeFile(wb, '企业考勤报表_' + new Date().toISOString().slice(0,10) + '.xlsx');
-            };
-        });
-    </script>
-</body>
-</html>
+                        '<td><span class="badge-' + cls + '">' + statusCn + '</span>
