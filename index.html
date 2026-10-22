@@ -7,7 +7,7 @@
     <link rel="manifest" href="/manifest.json">
     <title>企业员工自助服务与管理系统</title>
     
-    <!-- 1. 优先加载关键 SDK，确保后续代码调用时 SDK 已ready -->
+    <!-- 优先加载前端依赖 SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -166,7 +166,7 @@
         .badge-leave { color: #2563eb; font-weight: bold; background: #dbeafe; padding: 2px 6px; border-radius: 4px; }
 
         ul { padding-left: 0; list-style: none; max-height: 180px; overflow-y: auto; margin: 0; }
-        li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; }
+        li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         
         .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px; }
         .holiday-banner { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 16px; display: none; }
@@ -264,7 +264,8 @@
 
             <!-- 考勤打卡中心 -->
             <div class="card clock-card">
-                <div class="location-pill">📍 公司考勤打卡点 (550米范围)</div>
+                <!-- 已去掉括号内的 (550米范围) -->
+                <div class="location-pill">📍 公司考勤打卡点</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
@@ -372,8 +373,8 @@
 
             <!-- 2. 地图选点修改定位配置面板 -->
             <div class="card" style="border: 2px solid var(--primary-color);">
-                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (550米电子围栏)</h3>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡范围自动限制在 550 米内。</p>
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡限制范围实时同步。</p>
                 <div class="flex-row">
                     <div class="input-group">
                         <label>当前基准纬度 (Latitude)</label>
@@ -454,9 +455,9 @@
                 <div style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
                     <table>
                         <thead>
-                            <tr><th>员工姓名</th><th>打卡类型</th><th>记录时间与情况</th></tr>
+                            <tr><th>员工姓名</th><th>打卡类型</th><th>记录时间与情况</th><th>状态</th></tr>
                         </thead>
-                        <tbody id="adminAttendanceList"><tr><td colspan="3">加载中...</td></tr></tbody>
+                        <tbody id="adminAttendanceList"><tr><td colspan="4">加载中...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -519,7 +520,6 @@
     </div>
 
     <script>
-        // 确保 Supabase 和全局事件完全加载
         window.addEventListener('load', function() {
             const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
@@ -543,6 +543,21 @@
             var adminSection = document.getElementById('adminSection');
 
             var currentClockState = 'in';
+
+            // 辅助转换函数：将原本可能存储在数据库的英文类型转为优雅中文
+            function formatClockType(type) {
+                if (!type) return '考勤记录';
+                if (type === 'in' || type === 'clock-in') return '上班打卡';
+                if (type === 'out' || type === 'clock-out') return '下班打卡';
+                return type;
+            }
+
+            // 辅助判断函数：是否包含异常/迟到/超出范围/补卡
+            function isAbnormalType(type) {
+                if (!type) return false;
+                var str = String(type);
+                return str.indexOf('异常') !== -1 || str.indexOf('迟到') !== -1 || str.indexOf('超出') !== -1 || str.indexOf('补卡') !== -1 || str.indexOf('拒绝') !== -1;
+            }
 
             function showSection(section) {
                 if(loginSection) loginSection.style.display = 'none';
@@ -785,7 +800,7 @@
                             var dist = calculateDistance(result.position.lat, result.position.lng, COMPANY_LOCATION.latitude, COMPANY_LOCATION.longitude);
                             if (dist > COMPANY_LOCATION.maxDistance) {
                                 tip.style.color = '#dc2626';
-                                tip.textContent = '❌ 距离打卡点 ' + Math.round(dist) + '米 (超出550米限制)';
+                                tip.textContent = '❌ 距离打卡点 ' + Math.round(dist) + '米 (超出范围)';
                                 alert('不在打卡范围内！当前距离 ' + Math.round(dist) + '米');
                                 return;
                             }
@@ -804,13 +819,24 @@
                 });
             };
 
+            // 加载个人历史记录：改in/out为中文，正常绿色、异常红色
             async function loadHistory() {
                 var uRes = await sbClient.auth.getUser();
                 if(!uRes.data || !uRes.data.user) return;
                 var res = await sbClient.from('attendance').select('*').eq('user_id', uRes.data.user.id).limit(10);
                 var data = res.data;
                 document.getElementById('historyList').innerHTML = (!data || data.length === 0) ? '<li>暂无打卡记录</li>' : data.map(function(i) {
-                    return '<li><span>🟢 ' + i.clock_type + '</span><span style="color:#64748b;">' + new Date(i.clock_in_time || i.clock_time).toLocaleString() + '</span></li>';
+                    var cType = formatClockType(i.clock_type);
+                    var isAb = isAbnormalType(cType);
+                    var badgeClass = isAb ? 'badge-abnormal' : 'badge-normal';
+                    var statusText = isAb ? '异常' : '正常';
+                    return '<li>' +
+                        '<span>🟢 ' + cType + '</span>' +
+                        '<span style="display:flex; align-items:center; gap:8px;">' +
+                            '<span class="' + badgeClass + '">' + statusText + '</span>' +
+                            '<small style="color:#64748b;">' + new Date(i.clock_in_time || i.clock_time).toLocaleString() + '</small>' +
+                        '</span>' +
+                    '</li>';
                 }).join('');
             }
 
@@ -853,7 +879,7 @@
                 var data = res.data;
                 document.getElementById('empReimburseHistoryList').innerHTML = (!data || data.length === 0) ? '<li>暂无报销记录</li>' : data.map(function(i) {
                     var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
-                    return '<li><span>🧾 [' + i.apply_date + '] $' + i.amount + '</span><span class="badge-' + cls + '">' + i.status + '</span></li>';
+                    return '<li><span>🧾 [' + i.apply_date + '] $' + i.amount + '</span><span class="badge-' + cls + '">' + (i.status==='Approved'?'已同意':i.status==='Rejected'?'已拒绝':'审核中') + '</span></li>';
                 }).join('');
             }
 
@@ -900,6 +926,7 @@
                 var data = res.data;
                 document.getElementById('adminReimburseList').innerHTML = (!data || data.length === 0) ? '<tr><td colspan="7">暂无记录</td></tr>' : data.map(function(i) {
                     var cls = i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending';
+                    var statusCn = i.status==='Approved'?'已通过':i.status==='Rejected'?'已拒绝':'待处理';
                     var preview = i.receipt_url ? '<a href="' + i.receipt_url + '" target="_blank"><img src="' + i.receipt_url + '" class="receipt-preview"/></a>' : '无';
                     var dis = i.status!=='Pending'?'disabled':'';
                     return '<tr>' +
@@ -907,7 +934,7 @@
                         '<td>' + i.apply_date + '</td>' +
                         '<td>$' + i.amount + '</td>' +
                         '<td>' + preview + '</td>' +
-                        '<td><span class="badge-' + cls + '">' + i.status + '</span></td>' +
+                        '<td><span class="badge-' + cls + '">' + statusCn + '</span></td>' +
                         '<td>' + (i.admin_remark || '-') + '</td>' +
                         '<td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Approved\')">同意</button><button class="btn-danger" ' + dis + ' onclick="reviewReimburse(\'' + i.id + '\', \'Rejected\')">拒绝</button></td>' +
                     '</tr>';
@@ -950,7 +977,7 @@
                 document.getElementById('displayLat').value = tempLat.toFixed(6);
                 document.getElementById('displayLng').value = tempLng.toFixed(6);
                 document.getElementById('mapModal').style.display = 'none';
-                alert('📍 打卡定位基准已更新至云端 (550米范围生效)');
+                alert('📍 打卡定位基准已更新至云端');
             };
 
             async function populateManualUserSelect() {
@@ -975,6 +1002,7 @@
             document.getElementById('refreshAttendanceBtn').onclick = function() { loadAdminAttendance(); analyzeAttendanceData(); alert('已刷新'); };
             document.getElementById('analyzeAttendanceBtn').onclick = function() { analyzeAttendanceData(); alert('分析已刷新'); };
 
+            // 智能考勤分析：正常绿、异常红
             async function analyzeAttendanceData() {
                 var aRes = await sbClient.from('attendance').select('*').limit(100);
                 var pRes = await sbClient.from('profiles').select('*');
@@ -986,9 +1014,15 @@
 
                 var normal = 0, abnormal = 0;
                 document.getElementById('adminAttendanceAnalysisList').innerHTML = records.map(function(r) {
-                    var isAbab = r.clock_type.indexOf('异常') !== -1 || r.clock_type.indexOf('迟到') !== -1 || r.clock_type.indexOf('补卡') !== -1;
+                    var cType = formatClockType(r.clock_type);
+                    var isAbab = isAbnormalType(cType);
                     if(isAbab) abnormal++; else normal++;
-                    return '<tr><td>' + (pMap[r.user_id]||'未知') + '</td><td>' + r.clock_type + '</td><td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td><td><span class="badge-' + (isAbab?'abnormal':'normal') + '">' + (isAbab?'异常':'正常') + '</span></td></tr>';
+                    return '<tr>' +
+                        '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
+                        '<td>' + cType + '</td>' +
+                        '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
+                        '<td><span class="' + (isAbab?'badge-abnormal':'badge-normal') + '">' + (isAbab?'异常':'正常') + '</span></td>' +
+                    '</tr>';
                 }).join('');
                 document.getElementById('statTotal').textContent = records.length;
                 document.getElementById('statNormal').textContent = normal;
@@ -1022,7 +1056,7 @@
                     var uid = u.id || u.user_id;
                     var approved = u.is_approved || u.status === '已批准';
                     var dis = approved ? 'disabled' : '';
-                    return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td>' + (approved?'已批准':'待审核') + '</td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewUser(\'' + uid + '\', false)">拒绝</button></td></tr>';
+                    return '<tr><td>' + u.full_name + '</td><td>' + (u.created_at ? u.created_at.slice(0,10) : '') + '</td><td><span class="' + (approved?'badge-approved':'badge-pending') + '">' + (approved?'已批准':'待审核') + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewUser(\'' + uid + '\', true)">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewUser(\'' + uid + '\', false)">拒绝</button></td></tr>';
                 }).join('');
             }
             window.reviewUser = async function(id, isApproved) {
@@ -1039,7 +1073,8 @@
 
                 document.getElementById('adminLeaveList').innerHTML = (!leaves || leaves.length === 0) ? '<tr><td colspan="5">无请假</td></tr>' : leaves.map(function(l) {
                     var dis = l.status!=='待审批'?'disabled':'';
-                    return '<tr><td>' + pMap[l.user_id] + ' (' + l.request_type + ')</td><td>' + (l.start_date?l.start_date.slice(0,10):'') + '~' + (l.end_date?l.end_date.slice(0,10):'') + '</td><td>' + l.reason + '</td><td>' + l.status + '</td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', \'' + l.user_id + '\', \'' + l.request_type + '\', \'已批准\')">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', false, false, \'已拒绝\')">拒绝</button></td></tr>';
+                    var cls = l.status==='已批准'?'badge-approved':l.status==='已拒绝'?'badge-rejected':'badge-pending';
+                    return '<tr><td>' + pMap[l.user_id] + ' (' + l.request_type + ')</td><td>' + (l.start_date?l.start_date.slice(0,10):'') + '~' + (l.end_date?l.end_date.slice(0,10):'') + '</td><td>' + l.reason + '</td><td><span class="' + cls + '">' + l.status + '</span></td><td class="action-btns"><button class="btn-success" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', \'' + l.user_id + '\', \'' + l.request_type + '\', \'已批准\')">批准</button><button class="btn-danger" ' + dis + ' onclick="reviewLeave(\'' + l.id + '\', false, false, \'已拒绝\')">拒绝</button></td></tr>';
                 }).join('');
             }
             window.reviewLeave = async function(id, uid, type, status) {
@@ -1048,14 +1083,22 @@
                 loadAdminLeaves(); loadAdminAttendance();
             };
 
+            // 全公司监控列表：翻译in/out并标红标绿
             async function loadAdminAttendance() {
                 var aRes = await sbClient.from('attendance').select('*').limit(50);
                 var pRes = await sbClient.from('profiles').select('*');
                 var records = aRes.data;
                 var profiles = pRes.data;
                 var pMap = {}; if(profiles) profiles.forEach(function(p) { pMap[p.id || p.user_id] = p.full_name; });
-                document.getElementById('adminAttendanceList').innerHTML = (!records || records.length === 0) ? '<tr><td colspan="3">暂无记录</td></tr>' : records.map(function(r) {
-                    return '<tr><td>' + (pMap[r.user_id]||'未知') + '</td><td>' + r.clock_type + '</td><td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td></tr>';
+                document.getElementById('adminAttendanceList').innerHTML = (!records || records.length === 0) ? '<tr><td colspan="4">暂无记录</td></tr>' : records.map(function(r) {
+                    var cType = formatClockType(r.clock_type);
+                    var isAb = isAbnormalType(cType);
+                    return '<tr>' +
+                        '<td>' + (pMap[r.user_id]||'未知') + '</td>' +
+                        '<td>' + cType + '</td>' +
+                        '<td>' + new Date(r.clock_in_time || r.clock_time).toLocaleString() + '</td>' +
+                        '<td><span class="' + (isAb?'badge-abnormal':'badge-normal') + '">' + (isAb?'异常':'正常') + '</span></td>' +
+                    '</tr>';
                 }).join('');
             }
 
@@ -1071,7 +1114,7 @@
                     return {
                         '员工姓名': pMap[i.user_id] || '未知',
                         '打卡时间': new Date(i.clock_in_time || i.clock_time).toLocaleString(),
-                        '打卡说明': i.clock_type
+                        '打卡说明': formatClockType(i.clock_type)
                     };
                 });
                 var ws = XLSX.utils.json_to_sheet(excelData);
