@@ -6,56 +6,205 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
     <title>企业员工自助服务与管理系统</title>
+    <!-- 引入 SheetJS 用于导出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
             --bg-color: #f1f5f9;
             --card-bg: #ffffff;
             --text-main: #0f172a;
             --text-secondary: #64748b;
             --border-color: #e2e8f0;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
         }
+
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 16px; display: flex; justify-content: center; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+
         .container { width: 100%; max-width: 850px; }
-        .card { background: var(--card-bg); border: 1px solid rgba(226, 232, 240, 0.8); padding: 22px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05); }
+        
+        .card {
+            background: var(--card-bg);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            padding: 22px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
+        }
+
         .brand-logo-large { display: block; max-height: 64px; margin: 0 auto 16px auto; object-fit: contain; }
         .brand-logo-small { height: 32px; object-fit: contain; margin-right: 12px; vertical-align: middle; }
         .brand-header-flex { display: flex; align-items: center; }
+
         h2, h3 { margin-top: 0; color: var(--text-main); text-align: center; font-weight: 700; }
         h2 { font-size: 22px; margin-bottom: 18px; }
-        h3 { font-size: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        h3 { 
+            font-size: 16px; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 12px; 
+            margin-bottom: 16px; 
+            text-align: left; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+
         .input-group { margin-bottom: 14px; }
         label { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block; }
-        input, select, textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; background-color: #f8fafc; color: var(--text-main); }
-        button { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 14px 18px; border-radius: 10px; cursor: pointer; width: 100%; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
-        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            background-color: #f8fafc;
+            color: var(--text-main);
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background-color: #ffffff;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3); }
+        button:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed !important; box-shadow: none !important; opacity: 0.7; }
+
         .switch-btn { background: transparent; color: var(--primary-color); margin-top: 10px; font-size: 14px; box-shadow: none; }
-        .welcome-bar { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 14px 20px; border-radius: 12px; margin-bottom: 20px; font-size: 15px; color: #1e40af; font-weight: 600; }
+        .switch-btn:hover { background: #e0e7ff; transform: none; }
+
+        .welcome-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            color: #1e40af;
+            font-weight: 600;
+        }
         .logout-btn { background: #ef4444; width: auto; padding: 6px 12px; font-size: 12px; box-shadow: none; }
+        .logout-btn:hover { background: #dc2626; }
+
         .clock-card { text-align: center; padding: 28px 20px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
-        .time-display { font-size: 32px; font-weight: 800; color: #1e293b; margin-bottom: 4px; }
+        .time-display { font-size: 32px; font-weight: 800; color: #1e293b; letter-spacing: 1px; margin-bottom: 4px; }
         .date-display { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
-        .clock-circle-btn { width: 160px; height: 160px; border-radius: 50%; margin: 0 auto 16px auto; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-size: 18px; font-weight: 700; cursor: pointer; border: 6px solid rgba(255, 255, 255, 0.8); box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3); }
+        
+        .clock-circle-btn {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            margin: 0 auto 16px auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 6px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
+        }
         .clock-circle-btn.btn-in { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
         .clock-circle-btn.btn-out { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); }
-        .clock-circle-btn.btn-done { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
-        .location-pill { display: inline-flex; align-items: center; background: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+        .clock-circle-btn.btn-done { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); box-shadow: none; cursor: not-allowed; }
+        .clock-circle-btn .sub-text { font-size: 12px; font-weight: 400; opacity: 0.9; margin-top: 4px; }
+
+        .location-pill {
+            display: inline-flex;
+            align-items: center;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
         table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
         th, td { border: 1px solid var(--border-color); padding: 10px 12px; text-align: left; }
         th { background: #f8fafc; color: var(--text-main); font-weight: 600; }
+        
         .badge-pending { color: #d97706; font-weight: bold; background: #fef3c7; padding: 2px 6px; border-radius: 4px; }
         .badge-approved { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
         .badge-rejected { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
+        .badge-abnormal { color: #dc2626; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; }
+        .badge-normal { color: #16a34a; font-weight: bold; background: #dcfce7; padding: 2px 6px; border-radius: 4px; }
+        .badge-leave { color: #2563eb; font-weight: bold; background: #dbeafe; padding: 2px 6px; border-radius: 4px; }
+
         ul { padding-left: 0; list-style: none; max-height: 180px; overflow-y: auto; margin: 0; }
         li { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; }
+        
+        .announcement-item { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 8px; border-radius: 6px; font-size: 14px; }
+        .holiday-banner { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 16px; display: none; }
+        
+        .action-btns button { width: auto; padding: 4px 10px; font-size: 12px; margin-right: 4px; box-shadow: none; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-sm { width: auto; padding: 5px 12px; font-size: 12px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+        .stat-box { background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; text-align: center; }
+        .stat-num { font-size: 20px; font-weight: 800; color: var(--primary-color); margin-top: 4px; }
+
         .flex-row { display: flex; gap: 10px; }
         .flex-row .input-group { flex: 1; }
-        .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); }
-        #mapModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .map-modal-content { background: white; width: 90%; max-width: 600px; border-radius: 16px; padding: 20px; }
-        #amapContainer { width: 100%; height: 350px; border-radius: 10px; margin: 12px 0; border: 1px solid var(--border-color); }
+
+        .receipt-preview { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; }
+
+        #mapModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .map-modal-content {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+        #amapContainer {
+            width: 100%;
+            height: 350px;
+            border-radius: 10px;
+            margin: 12px 0;
+            border: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
@@ -88,14 +237,14 @@
             <button class="switch-btn" id="toLoginBtn" type="button">已有账号？返回登录</button>
         </div>
 
-        <!-- 待审核提示 -->
+        <!-- 待审核提示区域 -->
         <div id="pendingSection" class="card" style="display: none; text-align: center; max-width:420px; margin: 40px auto;">
             <h2 style="color: #d97706;">⏳ 账号正在审核中</h2>
-            <p style="color: var(--text-secondary); font-size: 14px;">您的注册申请已提交，请等待管理员审批。</p>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">您的注册申请已提交，请等待管理员审批后登录。</p>
             <button class="switch-btn" id="backToLoginBtn" type="button">返回登录页面</button>
         </div>
 
-        <!-- 员工主看板 -->
+        <!-- 员工主功能看板 -->
         <div id="dashboardSection" style="display: none;">
             <div class="welcome-bar">
                 <div class="brand-header-flex">
@@ -104,253 +253,130 @@
                 <button class="logout-btn" id="logoutBtn" type="button">退出</button>
             </div>
 
-            <!-- 打卡卡片 -->
+            <div class="card">
+                <h3>📢 公司最新公告</h3>
+                <div id="announcementList">加载公告中...</div>
+            </div>
+
+            <!-- 考勤打卡中心 -->
             <div class="card clock-card">
                 <div class="location-pill">📍 公司考勤打卡点 (550米范围)</div>
                 <div class="time-display" id="liveClock">00:00:00</div>
                 <div class="date-display" id="liveDate">加载中...</div>
 
+                <div id="holidayBanner" class="holiday-banner">🏖️ 今天是法定节假日/周末，无需打卡！</div>
+                
                 <button id="clockBtn" type="button" class="clock-circle-btn btn-in">
                     <span id="clockBtnMainText">上班打卡</span>
-                    <span id="clockBtnSubText" style="font-size:12px; font-weight:400; opacity:0.9;">09:00 前</span>
+                    <span id="clockBtnSubText" class="sub-text">09:00 前</span>
                 </button>
-                <p id="clockResult" style="font-size:13px; font-weight:600; margin-top:8px;"></p>
+                
+                <p id="clockResult" style="font-size:13px; font-weight:600; margin-top:8px; min-height: 20px;"></p>
                 
                 <div style="text-align: left; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-                    <h4 style="font-size:14px; margin:0 0 10px 0;">🗓️ 今日打卡记录：</h4>
+                    <h4 style="font-size:14px; margin:0 0 10px 0;">🗓️ 今日考勤与打卡记录：</h4>
                     <ul id="historyList"><li>加载中...</li></ul>
                 </div>
             </div>
 
-            <!-- 报销提交 -->
+            <!-- 提交报销申请模块 -->
             <div class="card" style="border: 2px solid #8b5cf6;">
                 <h3 style="color:#7c3aed;">📝 提交报销申请</h3>
                 <form id="employeeReimburseForm">
-                    <div class="input-group"><label>申请人姓名 *</label><input type="text" id="empApplicantName" required></div>
-                    <div class="flex-row">
-                        <div class="input-group"><label>申请日期 *</label><input type="date" id="empApplyDate" required></div>
-                        <div class="input-group"><label>金额 *</label><input type="number" step="0.01" id="empReimburseAmount" required></div>
+                    <div class="input-group">
+                        <label>申请人姓名 *</label>
+                        <input type="text" id="empApplicantName" placeholder="例如：张三" required>
                     </div>
-                    <div class="input-group"><label>上传凭证图片 *</label><input type="file" id="empReceiptFile" accept="image/*" required></div>
+                    <div class="flex-row">
+                        <div class="input-group">
+                            <label>申请时间 *</label>
+                            <input type="date" id="empApplyDate" required>
+                        </div>
+                        <div class="input-group">
+                            <label>报销金额 ($ / ¥) *</label>
+                            <input type="number" step="0.01" id="empReimburseAmount" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>上传报销凭证 (发票/收据图片) *</label>
+                        <input type="file" id="empReceiptFile" accept="image/*" required>
+                    </div>
                     <button type="submit" id="empSubmitReimburseBtn" style="background: #7c3aed;">📤 提交报销申请</button>
                 </form>
                 <p id="empReimburseResult" style="text-align:center; font-weight:600; margin-top:10px; font-size:13px;"></p>
-                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史报销：</h4>
+
+                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史报销记录：</h4>
                 <ul id="empReimburseHistoryList"><li>加载中...</li></ul>
+            </div>
+
+            <!-- 请假申请模块 -->
+            <div class="card">
+                <h3>📝 提交请假申请</h3>
+                <div class="input-group">
+                    <label>请假类型</label>
+                    <select id="leaveType">
+                        <option value="事假">事假</option>
+                        <option value="病假">病假</option>
+                        <option value="年假">年假</option>
+                    </select>
+                </div>
+                <div class="flex-row">
+                    <div class="input-group"><label>开始日期</label><input type="date" id="startDate"></div>
+                    <div class="input-group"><label>结束日期</label><input type="date" id="endDate"></div>
+                </div>
+                <div class="input-group"><label>请假事由说明</label><textarea id="leaveReason" placeholder="请输入详细事由..." rows="2"></textarea></div>
+                <button id="submitLeaveBtn" type="button">提交请假申请</button>
+                <p id="leaveResult" style="text-align:center; font-weight:600; margin-top:10px; font-size:13px;"></p>
+                
+                <h4 style="font-size:14px; margin:16px 0 8px 0; border-top:1px solid var(--border-color); padding-top:12px;">我的历史请假记录：</h4>
+                <ul id="leaveHistoryList"><li>加载中...</li></ul>
             </div>
         </div>
 
-        <!-- 管理员控制台 -->
+        <!-- 管理员控制台（完整恢复所有模块） -->
         <div id="adminSection" style="display: none;">
-            <div class="welcome-bar" style="background: #e0e7ff; color: #3730a3;">
-                <span>👑 管理员控制台</span>
+            <div class="welcome-bar" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #3730a3;">
+                <div class="brand-header-flex">
+                    <span>👑 管理员系统控制台</span>
+                </div>
                 <button class="logout-btn" id="adminLogoutBtn" type="button">退出</button>
             </div>
+
+            <!-- 1. 报销审批控制台 -->
             <div class="card" style="border: 2px solid #7c3aed;">
                 <h3>
-                    <span style="color:#7c3aed;">📋 报销审批</span>
-                    <button id="refreshReimburseBtn" type="button" style="width:auto; padding:6px 12px; font-size:12px; background:#7c3aed;">🔄 刷新</button>
+                    <span style="color:#7c3aed;">📋 报销申请审批控制台</span>
+                    <button id="refreshReimburseBtn" type="button" class="btn-sm" style="background: #7c3aed; color:white;">🔄 刷新报销列表</button>
                 </h3>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 280px; overflow-y: auto;">
                     <table>
-                        <thead><tr><th>申请人</th><th>时间</th><th>金额</th><th>凭证</th><th>状态</th><th>操作</th></tr></thead>
-                        <tbody id="adminReimburseList"><tr><td colspan="6">加载中...</td></tr></tbody>
+                        <thead>
+                            <tr>
+                                <th>申请人</th>
+                                <th>时间</th>
+                                <th>金额</th>
+                                <th>凭证</th>
+                                <th>状态</th>
+                                <th>备注</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminReimburseList"><tr><td colspan="7">加载中...</td></tr></tbody>
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- 引入 Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://webapi.amap.com/maps?v=2.0&key=da390c1044f829bace14781906526616"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const SUPABASE_URL = 'https://oscogbhwhxkxlrwonmyh.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zY29nYmh3aHhreGxyd29ubXloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mjg2NDksImV4cCI6MjEwNzEwNDY0OX0.DHuJfzEZeASoZp8dWPA1h-VxpaPSLykaBp5Ct12FlXI';
-
-            let sbClient;
-            try {
-                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                    auth: { persistSession: true, autoRefreshToken: true }
-                });
-            } catch (err) {
-                alert('Supabase 初始化失败: ' + err.message);
-                return;
-            }
-
-            const COMPANY_LOCATION = { latitude: 27.950720, longitude: 120.783677, maxDistance: 550 };
-
-            const loginSection = document.getElementById('loginSection');
-            const registerSection = document.getElementById('registerSection');
-            const pendingSection = document.getElementById('pendingSection');
-            const dashboardSection = document.getElementById('dashboardSection');
-            const adminSection = document.getElementById('adminSection');
-
-            function showSection(section) {
-                if(loginSection) loginSection.style.display = 'none';
-                if(registerSection) registerSection.style.display = 'none';
-                if(pendingSection) pendingSection.style.display = 'none';
-                if(dashboardSection) dashboardSection.style.display = 'none';
-                if(adminSection) adminSection.style.display = 'none';
-                if(section) section.style.display = 'block';
-            }
-
-            document.getElementById('toRegisterBtn').onclick = () => showSection(registerSection);
-            document.getElementById('toLoginBtn').onclick = () => showSection(loginSection);
-            document.getElementById('backToLoginBtn').onclick = () => showSection(loginSection);
-
-            // 🎯 极度强壮的手机端登录逻辑（带全过程弹窗捕获）
-            async function handleLogin() {
-                const email = document.getElementById('loginEmail').value.trim();
-                const password = document.getElementById('loginPassword').value.trim();
-                const btn = document.getElementById('loginBtn');
-
-                if (!email || !password) {
-                    alert('请输入邮箱和密码！');
-                    return;
-                }
-
-                btn.disabled = true;
-                btn.textContent = '登录中...';
-
-                try {
-                    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-                    if (error) {
-                        alert('登录失败: ' + error.message);
-                        return;
-                    }
-
-                    if (!data || !data.user) {
-                        alert('登录异常：未返回用户凭证');
-                        return;
-                    }
-
-                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-                    if (!profile) {
-                        const { data: newP } = await sbClient.from('profiles').insert([{ id: data.user.id, full_name: email, is_approved: false, status: '待审核', role: 'employee' }]).select().single();
-                        profile = newP || { role: 'employee', is_approved: false };
-                    }
-
-                    if (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin') {
-                        showSection(pendingSection);
-                        return;
-                    }
-
-                    if (profile.role === 'admin') {
-                        showSection(adminSection);
-                        loadAdminReimbursements();
-                    } else {
-                        showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name || email}`;
-                        document.getElementById('empApplicantName').value = profile.full_name || '';
-                        loadEmployeeData();
-                    }
-                } catch (err) {
-                    alert('发生未知错误: ' + (err.message || err));
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = '登录系统';
-                }
-            }
-
-            const loginBtn = document.getElementById('loginBtn');
-            loginBtn.onclick = handleLogin;
-            loginBtn.ontouchend = (e) => { e.preventDefault(); handleLogin(); };
-
-            // 检查现有会话
-            async function checkSession() {
-                try {
-                    const { data: { session } } = await sbClient.auth.getSession();
-                    if (!session || !session.user) { showSection(loginSection); return; }
-                    let { data: profile } = await sbClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-                    if (!profile || (!profile.is_approved && profile.status !== '已批准' && profile.role !== 'admin')) {
-                        showSection(pendingSection);
-                        return;
-                    }
-                    if (profile.role === 'admin') {
-                        showSection(adminSection);
-                        loadAdminReimbursements();
-                    } else {
-                        showSection(dashboardSection);
-                        document.getElementById('welcomeUser').textContent = `👋 欢迎，${profile.full_name}`;
-                        document.getElementById('empApplicantName').value = profile.full_name || '';
-                        loadEmployeeData();
-                    }
-                } catch (e) {
-                    showSection(loginSection);
-                }
-            }
-            checkSession();
-
-            document.getElementById('logoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
-            document.getElementById('adminLogoutBtn').onclick = async () => { await sbClient.auth.signOut(); location.reload(); };
-
-            function loadEmployeeData() {
-                // 加载打卡及报销记录
-                loadEmpReimburseHistory();
-            }
-
-            // 报销提交
-            document.getElementById('employeeReimburseForm').onsubmit = async function(e) {
-                e.preventDefault();
-                const btn = document.getElementById('empSubmitReimburseBtn');
-                const tip = document.getElementById('empReimburseResult');
-                const name = document.getElementById('empApplicantName').value.trim();
-                const date = document.getElementById('empApplyDate').value;
-                const amount = document.getElementById('empReimburseAmount').value;
-                const fileInput = document.getElementById('empReceiptFile');
-
-                if (!fileInput.files || fileInput.files.length === 0) { alert('请选择凭证图片！'); return; }
-
-                btn.disabled = true;
-                btn.textContent = '上传中...';
-                tip.textContent = '正在上传发票凭证...';
-
-                try {
-                    const file = fileInput.files[0];
-                    const filePath = `${Date.now()}_${Math.random().toString(36).substring(7)}.${file.name.split('.').pop()}`;
-
-                    const { error: upErr } = await sbClient.storage.from('receipts').upload(filePath, file);
-                    if (upErr) throw upErr;
-
-                    const { data: urlData } = sbClient.storage.from('receipts').getPublicUrl(filePath);
-
-                    const { error: dbErr } = await sbClient.from('reimbursements').insert([{
-                        applicant_name: name, apply_date: date, amount: parseFloat(amount), receipt_url: urlData.publicUrl, status: 'Pending'
-                    }]);
-                    if (dbErr) throw dbErr;
-
-                    tip.style.color = '#10b981';
-                    tip.textContent = '🎉 报销提交成功！';
-                    document.getElementById('employeeReimburseForm').reset();
-                    loadEmpReimburseHistory();
-                } catch (err) {
-                    tip.style.color = '#dc2626';
-                    tip.textContent = '提交失败: ' + err.message;
-                    alert('提交失败: ' + err.message);
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = '📤 提交报销申请';
-                }
-            };
-
-            async function loadEmpReimburseHistory() {
-                const historyEl = document.getElementById('empReimburseHistoryList');
-                if (!historyEl) return;
-                const { data } = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false }).limit(5);
-                historyEl.innerHTML = (!data || data.length === 0) ? '<li>暂无报销记录</li>' : data.map(i => `<li><span>🧾 [${i.apply_date}] $${i.amount}</span><span class="badge-${i.status==='Approved'?'approved':i.status==='Rejected'?'rejected':'pending'}">${i.status}</span></li>`).join('');
-            }
-
-            async function loadAdminReimbursements() {
-                const tbody = document.getElementById('adminReimburseList');
-                if (!tbody) return;
-                const { data } = await sbClient.from('reimbursements').select('*').order('created_at', { ascending: false });
-                tbody.innerHTML = (!data || data.length === 0) ? '<tr><td colspan="6">暂无记录</td></tr>' : data.map(i => `<tr><td>${i.applicant_name}</td><td>${i.apply_date}</td><td>$${i.amount}</td><td><a href="${i.receipt_url}" target="_blank">查看</a></td><td>${i.status}</td><td>-</td></tr>`).join('');
-            }
-            document.getElementById('refreshReimburseBtn').onclick = loadAdminReimbursements;
-        });
-    </script>
-</body>
-</html>
+            <!-- 2. 地图选点修改定位配置面板 -->
+            <div class="card" style="border: 2px solid var(--primary-color);">
+                <h3 style="color:var(--primary-color);">🗺️ 企业打卡定位基准设置 (550米电子围栏)</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-top: -8px;">修改后直接写入云端数据库，全员打卡范围自动限制在 550 米内。</p>
+                <div class="flex-row">
+                    <div class="input-group">
+                        <label>当前基准纬度 (Latitude)</label>
+                        <input type="text" id="displayLat" value="27.950720" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label>当前基准经度 (Longitude)</label>
+                        <input type="text" id="displayLng" value="120.783677" readonly>
+                    </div>
+                </div>
